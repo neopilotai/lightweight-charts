@@ -4,7 +4,6 @@ pub mod engine;
 pub mod signals;
 pub mod strategy;
 
-pub use backtest::{BacktestEngine, BacktestResult, BacktestTrade};
-pub use engine::{PortfolioStats, TradingEngine};
+pub use backtest::BacktestEngine;
 pub use signals::SignalGenerator;
-pub use strategy::{Strategy, StrategyConfig, StrategyManager, StrategyType};
+pub use strategy::{StrategyConfig, StrategyManager, StrategyType};
