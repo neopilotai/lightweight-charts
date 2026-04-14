@@ -1,8 +1,7 @@
 // src/trading/strategy.rs
-use crate::models::candle::Candle;
 use crate::models::orders::{Order, OrderSide, OrderType, Position, SignalType};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum StrategyType {
@@ -89,7 +88,7 @@ impl Strategy {
     }
 
     /// Check if strategy should exit position
-    pub fn should_exit(&self, position: &Position, current_price: f64) -> Option<String> {
+    pub fn should_exit(&self, position: &Position, _current_price: f64) -> Option<String> {
         let pnl_pct = position.unrealized_pnl_pct();
 
         // Stop loss
