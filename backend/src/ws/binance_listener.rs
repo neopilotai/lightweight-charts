@@ -96,7 +96,7 @@ pub async fn start_binance_listener(state: AppState) {
 
                             // Send via lock-free channel (retry on contention)
                             let mut retries = 0;
-                            while let Err(data) = state.market_channel.send(market_data.clone()) {
+                            while let Err(_data) = state.market_channel.send(market_data.clone()) {
                                 retries += 1;
                                 if retries > 3 {
                                     eprintln!("Channel full, dropping message");

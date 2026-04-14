@@ -1,7 +1,6 @@
 // src/ws/handler.rs
 use axum::extract::ws::{WebSocket, Message};
 use futures::{SinkExt, StreamExt};
-use std::sync::Arc;
 use crate::AppState;
 
 pub async fn handle_socket(mut socket: WebSocket, symbol: String, state: AppState) {
