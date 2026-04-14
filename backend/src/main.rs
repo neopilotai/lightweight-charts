@@ -1,6 +1,6 @@
 // src/main.rs
 use axum::{
-    routing::{get, post},
+    routing::get,
     Router,
     extract::ws::WebSocketUpgrade,
     response::IntoResponse,
@@ -10,7 +10,6 @@ use tower_http::cors::CorsLayer;
 use std::sync::Arc;
 use dashmap::DashMap;
 use std::collections::VecDeque;
-use parking_lot::RwLock;
 
 mod models;
 mod routes;
@@ -22,8 +21,7 @@ mod trading;
 use routes::market::get_candles;
 use routes::trading::{TradingState, create_strategy_simple, list_strategies as list_strats, get_signals};
 use ws::handler::handle_socket;
-use channels::{LockFreeChannel, MarketData};
-use trading::SignalGenerator;
+use channels::LockFreeChannel;
 
 const MAX_CANDLES: usize = 500;
 const QUEUE_CAPACITY: usize = 10000;
