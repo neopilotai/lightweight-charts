@@ -22,7 +22,7 @@ pub async fn get_candles(Query(params): Query<MarketQuery>, state: AppState) -> 
     
     // Fetch from API and cache
     match get_historical_candles(&symbol).await {
-        Ok(mut candles_vec) => {
+        Ok(candles_vec) => {
             let mut deque: VecDeque<Candle> = candles_vec.into_iter().collect();
             // Limit to MAX_CANDLES
             while deque.len() > MAX_CANDLES {
