@@ -11,7 +11,7 @@ use parking_lot::Mutex;
 
 use crate::AppState;
 use crate::trading::{
-    StrategyConfig, StrategyManager, StrategyType, BacktestEngine, SignalGenerator,
+    StrategyConfig, StrategyManager, StrategyType,
 };
 use crate::models::orders::Signal;
 
@@ -205,8 +205,8 @@ pub async fn get_strategy_stats(
 }
 
 pub async fn run_backtest(
-    State(trading_state): State<TradingState>,
-    State(app_state): State<AppState>,
+    State(_trading_state): State<TradingState>,
+    State(_app_state): State<AppState>,
     Json(_req): Json<BacktestRequest>,
 ) -> Json<BacktestResponse> {
     // Placeholder - in production would use actual candle data
