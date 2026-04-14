@@ -1,9 +1,9 @@
 // src/trading/backtest.rs
 use crate::models::candle::Candle;
-use crate::models::orders::{OrderSide, SignalType};
+use crate::models::orders::OrderSide;
 use crate::trading::engine::PortfolioStats;
 use crate::trading::signals::SignalGenerator;
-use crate::trading::strategy::{Strategy, StrategyConfig, StrategyType};
+use crate::trading::strategy::{Strategy, StrategyConfig};
 use std::collections::VecDeque;
 
 /// Backtesting engine
