@@ -1,6 +1,6 @@
 // src/trading/signals.rs
 use crate::models::candle::Candle;
-use crate::models::orders::{Signal, SignalIndicators, SignalType};
+use crate::models::orders::{Signal, SignalIndicators};
 use std::collections::VecDeque;
 
 pub struct SignalGenerator;
@@ -22,7 +22,7 @@ impl SignalGenerator {
         };
 
         let rsi = last_candle.rsi;
-        let macd_signal = last_candle.macd.is_some() && last_candle.signal.is_some();
+        let _macd_signal = last_candle.macd.is_some() && last_candle.signal.is_some();
         let ema_signal = last_candle.ema12.is_some() && last_candle.ema26.is_some();
 
         let mut confidence: f64 = 0.0;
