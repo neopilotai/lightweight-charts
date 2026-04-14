@@ -49,7 +49,7 @@ pub fn update_indicators_last(candles: &mut VecDeque<Candle>) {
     }
 
     let closes: Vec<f64> = candles.iter().map(|c| c.close).collect();
-    let last_idx = closes.len() - 1;
+    let _last_idx = closes.len() - 1;
 
     // Update RSI for last candle
     if let Some(rsi) = update_rsi_last(&closes, 14) {
