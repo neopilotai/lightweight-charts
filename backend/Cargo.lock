@@ -99,28 +99,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "backend"
-version = "0.1.0"
-dependencies = [
- "axum",
- "chrono",
- "crossbeam",
- "dashmap",
- "futures",
- "once_cell",
- "parking_lot",
- "reqwest",
- "serde",
- "serde_json",
- "smallvec",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite 0.20.1",
- "tower-http",
- "url",
-]
-
-[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -901,6 +879,28 @@ name = "libc"
 version = "0.2.185"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
+
+[[package]]
+name = "lightweight-charts-backend"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "crossbeam",
+ "dashmap",
+ "futures",
+ "once_cell",
+ "parking_lot",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite 0.20.1",
+ "tower-http",
+ "url",
+]
 
 [[package]]
 name = "linux-raw-sys"
