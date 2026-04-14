@@ -1,5 +1,5 @@
 // src/trading/engine.rs
-use crate::models::orders::{Order, OrderSide, Position, Trade, TradeResult};
+use crate::models::orders::{OrderSide, Position, Trade, TradeResult};
 use dashmap::DashMap;
 use std::sync::Arc;
 
@@ -69,8 +69,8 @@ impl TradingEngine {
         *balance += net_revenue;
         *self.total_fees.lock() += fee;
 
-        let pnl = (price - entry_price) * quantity;
-        let pnl_pct = ((price - entry_price) / entry_price) * 100.0;
+        let _pnl = (price - entry_price) * quantity;
+        let _pnl_pct = ((price - entry_price) / entry_price) * 100.0;
 
         let result = TradeResult::new(
             chrono::Utc::now().timestamp(),
