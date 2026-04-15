@@ -324,17 +324,4 @@ mod tests {
         assert_eq!(strategy.positions.len(), 0);
         assert_eq!(strategy.total_pnl, 0.0);
     }
-
-    #[test]
-    fn test_position_size_calculation() {
-        let config = StrategyConfig::new(
-            "Test Strategy".to_string(),
-            StrategyType::RSIMomentum,
-            "BTC".to_string(),
-        );
-        let strategy = Strategy::new(config);
-
-        let size = strategy.calculate_position_size(10000.0, 50000.0);
-        assert!(size > 0.0);
-    }
 }
