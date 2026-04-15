@@ -2,15 +2,48 @@
 use crate::models::candle::Candle;
 use std::collections::VecDeque;
 
-pub fn calculate_indicators(candles: &mut Vec<Candle>) {
+#[derive(Debug, Clone)]
+pub struct IndicatorParams {
+    pub rsi_period: usize,
+    pub ema_short: usize,
+    pub ema_long: usize,
+    pub macd_fast: usize,
+    pub macd_slow: usize,
+    pub macd_signal: usize,
+    pub bb_period: usize,
+    pub bb_std: f64,
+    pub stoch_period: usize,
+    pub stoch_smooth: usize,
+}
+
+impl Default for IndicatorParams {
+    fn default() -> Self {
+        Self {
+            rsi_period: 14,
+            ema_short: 12,
+            ema_long: 26,
+            macd_fast: 12,
+            macd_slow: 26,
+            macd_signal: 9,
+            bb_period: 20,
+            bb_std: 2.0,
+            stoch_period: 14,
+            stoch_smooth: 3,
+        }
+    }
+}
+
+pub fn calculate_indicators_with_params(candles: &mut Vec<Candle>, params: &IndicatorParams) {
     if candles.is_empty() {
         return;
     }
 
     let closes: Vec<f64> = candles.iter().map(|c| c.close).collect();
+    let highs: Vec<f64> = candles.iter().map(|c| c.high).collect();
+    let lows: Vec<f64> = candles.iter().map(|c| c.low).collect();
 
-    // Calculate RSI (14-period)
-    let rsi_values = calculate_rsi(&closes, 14);
+    // Calculate RSI
+    let rsi_values = calculate_rsi(&closes, params.rsi_period);
     for (i, rsi) in rsi_values.into_iter().enumerate() {
         if let Some(candle) = candles.get_mut(i) {
             candle.rsi = rsi;
@@ -18,22 +51,27 @@ pub fn calculate_indicators(candles: &mut Vec<Candle>) {
     }
 
     // Calculate EMAs
-    let ema12_values = calculate_ema(&closes, 12);
-    let ema26_values = calculate_ema(&closes, 26);
+    let ema_short_values = calculate_ema(&closes, params.ema_short);
+    let ema_long_values = calculate_ema(&closes, params.ema_long);
 
-    for (i, ema12) in ema12_values.into_iter().enumerate() {
+    for (i, ema) in ema_short_values.into_iter().enumerate() {
         if let Some(candle) = candles.get_mut(i) {
-            candle.ema12 = ema12;
+            candle.ema12 = ema;
         }
     }
-    for (i, ema26) in ema26_values.into_iter().enumerate() {
+    for (i, ema) in ema_long_values.into_iter().enumerate() {
         if let Some(candle) = candles.get_mut(i) {
-            candle.ema26 = ema26;
+            candle.ema26 = ema;
         }
     }
 
-    // Calculate MACD
-    let macd_values = calculate_macd(&closes);
+    // Calculate MACD with custom parameters
+    let macd_values = calculate_macd_custom(
+        &closes,
+        params.macd_fast,
+        params.macd_slow,
+        params.macd_signal,
+    );
     for (i, macd) in macd_values.into_iter().enumerate() {
         if let Some(candle) = candles.get_mut(i) {
             candle.macd = macd.macd;
@@ -41,6 +79,35 @@ pub fn calculate_indicators(candles: &mut Vec<Candle>) {
             candle.histogram = macd.histogram;
         }
     }
+
+    // Calculate Bollinger Bands
+    let bb_values = calculate_bollinger_bands(&closes, params.bb_period, params.bb_std);
+    for (i, bb) in bb_values.into_iter().enumerate() {
+        if let Some(candle) = candles.get_mut(i) {
+            candle.bollinger_upper = bb.upper;
+            candle.bollinger_middle = bb.middle;
+            candle.bollinger_lower = bb.lower;
+        }
+    }
+
+    // Calculate Stochastic
+    let stoch_values = calculate_stochastic(
+        &highs,
+        &lows,
+        &closes,
+        params.stoch_period,
+        params.stoch_smooth,
+    );
+    for (i, stoch) in stoch_values.into_iter().enumerate() {
+        if let Some(candle) = candles.get_mut(i) {
+            candle.stoch_k = stoch.k;
+            candle.stoch_d = stoch.d;
+        }
+    }
+}
+
+pub fn calculate_indicators(candles: &mut Vec<Candle>) {
+    calculate_indicators_with_params(candles, &IndicatorParams::default());
 }
 
 pub fn update_indicators_last(candles: &mut VecDeque<Candle>) {
@@ -261,12 +328,145 @@ fn update_macd_last(closes: &[f64]) -> Option<MacdValue> {
     let ema26 = update_ema_last(closes, 26)?;
     let macd = ema12 - ema26;
 
-    // For signal, need full series, simplified for last
     Some(MacdValue {
         macd: Some(macd),
-        signal: None, // Would need full recalc
+        signal: None,
         histogram: None,
     })
+}
+
+fn calculate_macd_custom(
+    closes: &[f64],
+    fast: usize,
+    slow: usize,
+    signal: usize,
+) -> Vec<MacdValue> {
+    let ema_fast = calculate_ema(closes, fast);
+    let ema_slow = calculate_ema(closes, slow);
+    let mut macd_line = vec![None; closes.len()];
+
+    for i in 0..closes.len() {
+        if let (Some(f), Some(s)) = (ema_fast[i], ema_slow[i]) {
+            macd_line[i] = Some(f - s);
+        }
+    }
+
+    let signal_values: Vec<f64> = macd_line.iter().filter_map(|&x| x).collect();
+    let signal_line = calculate_ema(&signal_values, signal);
+
+    let mut signal_full = vec![None; closes.len()];
+    let start = slow + signal - 1;
+    for (i, sig) in signal_line.into_iter().enumerate() {
+        if let Some(s) = sig {
+            if i + start < closes.len() {
+                signal_full[i + start] = Some(s);
+            }
+        }
+    }
+
+    let mut macd_values = vec![];
+    for i in 0..closes.len() {
+        let histogram = match (macd_line[i], signal_full[i]) {
+            (Some(m), Some(s)) => Some(m - s),
+            _ => None,
+        };
+        macd_values.push(MacdValue {
+            macd: macd_line[i],
+            signal: signal_full[i],
+            histogram,
+        });
+    }
+    macd_values
+}
+
+struct BollingerValue {
+    upper: Option<f64>,
+    middle: Option<f64>,
+    lower: Option<f64>,
+}
+
+fn calculate_bollinger_bands(
+    closes: &[f64],
+    period: usize,
+    std_multiplier: f64,
+) -> Vec<BollingerValue> {
+    let mut bb_values = vec![
+        BollingerValue {
+            upper: None,
+            middle: None,
+            lower: None
+        };
+        closes.len()
+    ];
+
+    if closes.len() < period {
+        return bb_values;
+    }
+
+    for i in (period - 1)..closes.len() {
+        let slice = &closes[i - period + 1..=i];
+        let mean = slice.iter().sum::<f64>() / period as f64;
+        let variance = slice.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / period as f64;
+        let std = variance.sqrt();
+
+        bb_values[i] = BollingerValue {
+            middle: Some(mean),
+            upper: Some(mean + std_multiplier * std),
+            lower: Some(mean - std_multiplier * std),
+        };
+    }
+    bb_values
+}
+
+struct StochasticValue {
+    k: Option<f64>,
+    d: Option<f64>,
+}
+
+fn calculate_stochastic(
+    highs: &[f64],
+    lows: &[f64],
+    closes: &[f64],
+    period: usize,
+    smooth: usize,
+) -> Vec<StochasticValue> {
+    let mut stoch_values = vec![StochasticValue { k: None, d: None }; closes.len()];
+
+    if closes.len() < period {
+        return stoch_values;
+    }
+
+    let mut k_values = vec![None; closes.len()];
+
+    for i in (period - 1)..closes.len() {
+        let high_slice = &highs[i - period + 1..=i];
+        let low_slice = &lows[i - period + 1..=i];
+
+        let highest = high_slice.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let lowest = low_slice.iter().cloned().fold(f64::INFINITY, f64::min);
+
+        let range = highest - lowest;
+        if range > 0.0 {
+            k_values[i] = Some(100.0 * (closes[i] - lowest) / range);
+        }
+    }
+
+    // Smooth %K to get %D
+    for i in (smooth - 1)..closes.len() {
+        let slice: Vec<f64> = k_values[i - smooth + 1..=i]
+            .iter()
+            .filter_map(|&x| x)
+            .collect();
+        if slice.len() == smooth {
+            let k = slice.iter().sum::<f64>() / smooth as f64;
+            stoch_values[i] = StochasticValue {
+                k: k_values[i],
+                d: Some(k),
+            };
+        }
+    }
+
+    stoch_values
 }
 
 #[cfg(test)]
@@ -275,10 +475,9 @@ mod tests {
 
     fn sample_closes() -> Vec<f64> {
         vec![
-            44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08,
-            45.89, 46.03, 45.61, 46.28, 46.28, 46.00, 46.03, 46.41, 46.22, 45.64,
-            46.21, 46.25, 45.71, 46.45, 45.78, 45.35, 44.03, 44.18, 44.22, 44.57,
-            43.42, 42.66, 43.13, 43.72, 44.03, 43.61,
+            44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03,
+            45.61, 46.28, 46.28, 46.00, 46.03, 46.41, 46.22, 45.64, 46.21, 46.25, 45.71, 46.45,
+            45.78, 45.35, 44.03, 44.18, 44.22, 44.57, 43.42, 42.66, 43.13, 43.72, 44.03, 43.61,
         ]
     }
 
@@ -292,8 +491,15 @@ mod tests {
         let last_rsi = rsi_values.last().unwrap().unwrap();
         let incremental_rsi = update_rsi_last(&closes, 14).unwrap();
 
-        assert!((last_rsi - 71.27).abs() < 0.5, "expected RSI around 71.27, got {}", last_rsi);
-        assert!((incremental_rsi - last_rsi).abs() < 1.0e-6, "incremental RSI must match full RSI");
+        assert!(
+            (last_rsi - 71.27).abs() < 0.5,
+            "expected RSI around 71.27, got {}",
+            last_rsi
+        );
+        assert!(
+            (incremental_rsi - last_rsi).abs() < 1.0e-6,
+            "incremental RSI must match full RSI"
+        );
     }
 
     #[test]
