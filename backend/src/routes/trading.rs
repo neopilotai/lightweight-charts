@@ -42,6 +42,36 @@ pub struct CreateStrategyRequest {
     pub max_positions: Option<usize>,
 }
 
+impl CreateStrategyRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.is_empty() || self.name.len() > 100 {
+            return Err("name must be between 1 and 100 characters".to_string());
+        }
+        
+        if let Some(risk) = self.risk_percent {
+            if risk < 0.1 || risk > 100.0 {
+                return Err("risk_percent must be between 0.1 and 100.0".to_string());
+            }
+        }
+        
+        if self.symbol.is_empty() || self.symbol.len() > 20 {
+            return Err("symbol must be between 1 and 20 characters".to_string());
+        }
+        
+        if !self.symbol.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) {
+            return Err("symbol must contain only uppercase letters and digits".to_string());
+        }
+        
+        if let Some(max_pos) = self.max_positions {
+            if max_pos < 1 || max_pos > 10 {
+                return Err("max_positions must be between 1 and 10".to_string());
+            }
+        }
+        
+        Ok(())
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct UpdateStrategyRequest {
     pub risk_percent: Option<f64>,
@@ -246,30 +276,36 @@ pub fn create_router(trading_state: TradingState) -> Router<TradingState> {
 }
 
 // Simpler version that works with current AppState
+// Simpler version that works with current AppState
 pub async fn create_strategy_simple(
     State(trading_state): State<TradingState>,
-    Json(req): Json<CreateStrategyRequest>,
-) -> Json<StrategyResponse> {
-    let strategy_type = match req.strategy_type.as_str() {
+    req: axum::extract::Json<CreateStrategyRequest>,
+) -> Json<StrategyResponse> {    
+    // Validate request
+    if let Err(e) = req.0.validate() {
+        panic!("Invalid request: {}", e);
+    }
+    
+    let strategy_type = match req.0.strategy_type.as_str() {
         "moving_average_crossover" => StrategyType::MovingAverageCrossover,
         "rsi_momentum" => StrategyType::RSIMomentum,
         "macd_crossover" => StrategyType::MACDCrossover,
         "multi_indicator" => StrategyType::MultiIndicator,
-        _ => StrategyType::Custom(req.strategy_type.clone()),
+        _ => StrategyType::Custom(req.0.strategy_type.clone()),
     };
 
-    let mut config = StrategyConfig::new(req.name.clone(), strategy_type, req.symbol.clone());
+    let mut config = StrategyConfig::new(req.0.name.clone(), strategy_type, req.0.symbol.clone());
 
-    if let Some(risk) = req.risk_percent {
+    if let Some(risk) = req.0.risk_percent {
         config.risk_percent = risk;
     }
-    if let Some(stop_loss) = req.stop_loss_pct {
+    if let Some(stop_loss) = req.0.stop_loss_pct {
         config.stop_loss_pct = stop_loss;
     }
-    if let Some(take_profit) = req.take_profit_pct {
+    if let Some(take_profit) = req.0.take_profit_pct {
         config.take_profit_pct = take_profit;
     }
-    if let Some(max_pos) = req.max_positions {
+    if let Some(max_pos) = req.0.max_positions {
         config.max_positions = max_pos;
     }
 
@@ -281,7 +317,7 @@ pub async fn create_strategy_simple(
 
     Json(StrategyResponse {
         id,
-        name: req.name,
+        name: req.0.name,
         enabled: true,
         config,
     })
