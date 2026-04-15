@@ -7,10 +7,44 @@ use crate::models::candle::Candle;
 use crate::models::indicators::update_indicators_last;
 use crate::models::binance::*;
 use crate::channels::MarketData;
-use crate::metrics::{CANDLES_PROCESSED, PARSE_ERRORS, BINANCE_RECONNECTS, BINANCE_CONNECTED, MESSAGE_LATENCY};
+use crate::metrics::{CANDLES_PROCESSED, PARSE_ERRORS, BINANCE_RECONNECTS, BINANCE_CONNECTED, MESSAGE_LATENCY, CIRCUIT_BREAKER_STATE};
+use crate::ws::circuit_breaker::CircuitBreaker;
 use std::collections::VecDeque;
 use futures::StreamExt;
 use std::time::Instant;
+use std::sync::atomic::{AtomicU64, Ordering};
+use lazy_static::lazy_static;
+use parking_lot::Mutex;
+
+static CIRCUIT_BREAKER: once_cell::sync::Lazy<CircuitBreaker> = once_cell::sync::Lazy::new(|| {
+    CircuitBreaker::new(3, 30)
+});
+
+lazy_static! {
+    static ref DEAD_LETTER_QUEUE: Mutex<Vec<DeadLetterEntry>> = Mutex::new(Vec::new());
+    static ref ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
+    static ref TOTAL_MESSAGES: AtomicU64 = AtomicU64::new(0);
+}
+
+#[derive(Clone)]
+pub struct DeadLetterEntry {
+    pub timestamp: u64,
+    pub error: String,
+    pub payload: String,
+}
+
+pub fn get_dead_letter_queue() -> Vec<DeadLetterEntry> {
+    DEAD_LETTER_QUEUE.lock().iter().cloned().collect()
+}
+
+pub fn get_error_rate() -> f64 {
+    let total = TOTAL_MESSAGES.load(Ordering::Relaxed);
+    let errors = ERROR_COUNT.load(Ordering::Relaxed);
+    if total == 0 {
+        return 0.0;
+    }
+    (errors as f64 / total as f64) * 100.0
+}
 
 fn calculate_backoff(attempt: u32) -> tokio::time::Duration {
     // Exponential backoff with jitter: 1s, 2s, 4s, 8s, 16s, 32s, 60s (max)
@@ -20,6 +54,22 @@ fn calculate_backoff(attempt: u32) -> tokio::time::Duration {
         (fastrand::u64(0..1000) as u64) // Random 0-999ms jitter
     );
     exp + jitter
+}
+
+fn add_to_dead_letter_queue(error: String, payload: String) {
+    let mut queue = DEAD_LETTER_QUEUE.lock();
+    queue.push(DeadLetterEntry {
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        error,
+        payload,
+    });
+    // Keep max 100 errors
+    while queue.len() > 100 {
+        queue.remove(0);
+    }
 }
 
 fn get_next_sequence(state: &AppState, symbol: &str) -> u64 {
@@ -38,16 +88,35 @@ pub async fn start_binance_listener(state: AppState) {
     let mut reconnect_attempt = 0u32;
 
     loop {
+        // Check circuit breaker before attempting connection
+        if !CIRCUIT_BREAKER.can_execute() {
+            tracing::warn!("Circuit breaker open, waiting before retry...");
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            continue;
+        }
+
         let url = Url::parse(&stream_url).unwrap();
         let (ws_stream, _) = match connect_async(url).await {
             Ok(conn) => {
                 // Reset reconnect counter on successful connection
                 reconnect_attempt = 0;
                 BINANCE_CONNECTED.set(1);
+                CIRCUIT_BREAKER.record_success();
+                CIRCUIT_BREAKER_STATE.set(0);
                 tracing::info!("Connected to Binance WebSocket");
                 conn
             },
             Err(e) => {
+                CIRCUIT_BREAKER.record_failure();
+                let state = CIRCUIT_BREAKER.state();
+                let state_val = match state {
+                    "closed" => 0,
+                    "open" => 1,
+                    "half_open" => 2,
+                    _ => 0,
+                };
+                CIRCUIT_BREAKER_STATE.set(state_val);
+                
                 let backoff = calculate_backoff(reconnect_attempt);
                 BINANCE_RECONNECTS.inc();
                 BINANCE_CONNECTED.set(0);
@@ -193,6 +262,9 @@ pub async fn start_binance_listener(state: AppState) {
                             }
                         }
 Err(e) => {
+                            TOTAL_MESSAGES.fetch_add(1, Ordering::Relaxed);
+                            ERROR_COUNT.fetch_add(1, Ordering::Relaxed);
+                            add_to_dead_letter_queue(format!("Parse error: {}", e), text.clone());
                             PARSE_ERRORS.inc();
                             tracing::error!(error = %e, "Failed to parse Binance message");
                             continue;
