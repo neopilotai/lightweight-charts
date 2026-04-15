@@ -1,23 +1,10 @@
-# Build stage
-FROM rust:1.75 AS builder
+# Build stage (using pre-built binary for speed)
+FROM debian:bookworm-slim AS builder
 
 WORKDIR /app
 
-# Install build essentials
-RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
-
-# Copy Cargo files
-COPY backend/Cargo.toml backend/Cargo.lock ./
-RUN mkdir backend/src && touch backend/src/lib.rs
-
-# Download dependencies
-RUN cargo fetch
-
-# Copy source
-COPY backend/src ./src
-
-# Build release
-RUN cargo build --release --bin lightweight-charts-backend
+# Copy pre-built binary
+COPY backend/target/release/lightweight-charts-backend /app/
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -27,8 +14,8 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Copy binary
-COPY --from=builder /app/target/release/lightweight-charts-backend /app/
+# Copy binary from builder
+COPY --from=builder /app/lightweight-charts-backend /app/
 
 # Create data directory
 RUN mkdir -p /app/data
