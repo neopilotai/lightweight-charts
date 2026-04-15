@@ -297,23 +297,23 @@
 
 ---
 
-### Sprint 4.2: Integration Tests (Days 2-3) ⏳ NOT IMPLEMENTED
+### Sprint 4.2: Integration Tests (Days 2-3) ✅ COMPLETE
 
-- [ ] **Test end-to-end flow**
-  - [ ] Mock Binance API
-  - [ ] Start server
-  - [ ] Connect WebSocket client
-  - [ ] Verify candles arrive in order
-  - [ ] Verify indicators computed correctly
-  - [ ] Create strategy
-  - [ ] Verify signals generated
+- [x] **Test end-to-end flow**
+  - [x] Mock Binance API
+  - [x] Start server
+  - [x] Connect WebSocket client
+  - [x] Verify candles arrive in order
+  - [x] Verify indicators computed correctly
+  - [x] Create strategy
+  - [x] Verify signals generated
 
-- [ ] **Test failure scenarios**
-  - [ ] Binance disconnects -> auto-reconnect
-  - [ ] Client disconnect -> cleanup connections
-  - [ ] Malformed message -> error logged, system continues
+- [x] **Test failure scenarios**
+  - [x] Binance disconnects -> auto-reconnect
+  - [x] Client disconnect -> cleanup connections
+  - [x] Malformed message -> error logged, system continues
 
-**Files to Create**: `tests/integration_tests.rs`
+**Files Created**: `backend/tests/integration_tests.rs` ✅
 
 ---
 
@@ -411,7 +411,7 @@
 | Phase 1 | ✅ COMPLETE | 95% |
 | Phase 2 | ✅ COMPLETE | 90% |
 | Phase 3 | 🔒 PENDING | 20% |
-| Phase 4 | 🔒 IN PROGRESS | 40% |
+| Phase 4 | 🔒 IN PROGRESS | 60% |
 
 ---
 
