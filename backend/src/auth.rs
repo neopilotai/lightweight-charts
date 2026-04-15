@@ -76,7 +76,9 @@ pub fn extract_user_id(authorization: Option<axum::http::HeaderValue>) -> Option
     }
 }
 
-pub fn require_user_id(headers: &HeaderMap) -> Result<String, impl IntoResponse> {
+pub fn require_user_id(
+    headers: &HeaderMap,
+) -> Result<String, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
     let authorization = headers
         .get("authorization")
         .and_then(|value| value.to_str().ok())
@@ -87,13 +89,12 @@ pub fn require_user_id(headers: &HeaderMap) -> Result<String, impl IntoResponse>
             )
         })?;
 
-    let token = authorization.strip_prefix("Bearer ")
-        .ok_or_else(|| {
-            (
-                axum::http::StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "Invalid Authorization header format"})),
-            )
-        })?;
+    let token = authorization.strip_prefix("Bearer ").ok_or_else(|| {
+        (
+            axum::http::StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Invalid Authorization header format"})),
+        )
+    })?;
 
     verify_token(token)
         .map(|claims| claims.user_id)
