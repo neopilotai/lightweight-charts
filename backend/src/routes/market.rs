@@ -92,18 +92,18 @@ pub async fn get_candles_rate_limited(
 }
 
 pub async fn get_candles_custom_indicators(
-    Query(params): Query<IndicatorQuery>,
+    Query(query): Query<IndicatorQuery>,
     state: AppState,
 ) -> Result<Json<Vec<Candle>>, axum::http::StatusCode> {
-    let symbol = params.symbol.unwrap_or_else(|| "btcusdt".to_string()).to_lowercase();
-    let interval = params.interval.unwrap_or_else(|| "1m".to_string());
+    let symbol = query.symbol.unwrap_or_else(|| "btcusdt".to_string()).to_lowercase();
+    let interval = query.interval.unwrap_or_else(|| "1m".to_string());
     
     let mut params = IndicatorParams::default();
-    if let Some(rsi) = params.rsi_period { params.rsi_period = rsi; }
-    if let Some(fast) = params.macd_fast { params.macd_fast = fast; }
-    if let Some(slow) = params.macd_slow { params.macd_slow = slow; }
-    if let Some(period) = params.bb_period { params.bb_period = period; }
-    if let Some(std) = params.bb_std { params.bb_std = std; }
+    if let Some(rsi) = query.rsi_period { params.rsi_period = rsi; }
+    if let Some(fast) = query.macd_fast { params.macd_fast = fast; }
+    if let Some(slow) = query.macd_slow { params.macd_slow = slow; }
+    if let Some(period) = query.bb_period { params.bb_period = period; }
+    if let Some(std) = query.bb_std { params.bb_std = std; }
     
     let cache_key = format!("{}:{}:custom", symbol, interval);
     
