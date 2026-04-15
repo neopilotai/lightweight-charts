@@ -1,6 +1,8 @@
 // src/auth.rs
+use axum::{http::HeaderMap, response::IntoResponse, Json};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const JWT_SECRET: &[u8] = b"trading_chart_secret_key_change_in_production";
@@ -72,4 +74,33 @@ pub fn extract_user_id(authorization: Option<axum::http::HeaderValue>) -> Option
     } else {
         None
     }
+}
+
+pub fn require_user_id(headers: &HeaderMap) -> Result<String, impl IntoResponse> {
+    let authorization = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| {
+            (
+                axum::http::StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Missing Authorization header"})),
+            )
+        })?;
+
+    let token = authorization.strip_prefix("Bearer ")
+        .ok_or_else(|| {
+            (
+                axum::http::StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Invalid Authorization header format"})),
+            )
+        })?;
+
+    verify_token(token)
+        .map(|claims| claims.user_id)
+        .map_err(|_| {
+            (
+                axum::http::StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Invalid or expired token"})),
+            )
+        })
 }
