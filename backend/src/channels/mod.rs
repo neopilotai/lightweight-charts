@@ -7,6 +7,7 @@ use std::sync::Arc;
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct MarketData {
     pub symbol: String,
+    pub sequence: u64,
     pub time: u64,
     pub open: f64,
     pub high: f64,
