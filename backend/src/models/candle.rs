@@ -8,6 +8,7 @@ pub struct Candle {
     pub high: f64,
     pub low: f64,
     pub close: f64,
+    pub volume: f64,
     pub rsi: Option<f64>,
     pub ema12: Option<f64>,
     pub ema26: Option<f64>,
