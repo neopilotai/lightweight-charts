@@ -21,12 +21,12 @@ use axum::{
     extract::ws::WebSocketUpgrade,
     response::IntoResponse,
 };
-use tokio::net::TcpListener;
-use tower_http::cors::{CorsLayer, Any, AllowOrigin};
 use axum::http::HeaderValue;
+use tokio::{net::TcpListener, sync::Notify};
+use tower_http::cors::{CorsLayer, Any, AllowOrigin};
 
 use routes::market::get_candles_rate_limited;
-use routes::trading::{TradingState, create_strategy_simple, list_strategies as list_strats, get_signals};
+use routes::trading::{TradingState, create_router};
 use routes::health::{create_health_router, HealthState};
 use routes::auth::create_auth_router;
 use ws::handler::handle_socket;
@@ -121,21 +121,10 @@ async fn main() {
     let app = Router::new()
         .merge(create_health_router(health_state))
         .merge(create_auth_router())
+        .nest("/api/trading", create_router(trading_state.clone()))
         .route("/api/candles", get({
             let state = state.clone();
             move |query, connect_info| get_candles_rate_limited(query, state, connect_info)
-        }))
-        .route("/api/trading/strategies", axum::routing::post({
-            let ts = trading_state.clone();
-            move |body| create_strategy_simple(axum::extract::State(ts), body)
-        }))
-        .route("/api/trading/strategies/list", get({
-            let ts = trading_state.clone();
-            move || list_strats(axum::extract::State(ts))
-        }))
-        .route("/api/trading/signals", get({
-            let ts = trading_state.clone();
-            move || get_signals(axum::extract::State(ts))
         }))
         .route("/ws", get({
             let state = state.clone();
@@ -149,26 +138,52 @@ async fn main() {
     
     // Set up signal handlers for graceful shutdown
     let shutdown = state.shutdown_signal.clone();
+    let shutdown_notify = Arc::new(Notify::new());
+    let shutdown_notify_clone = shutdown_notify.clone();
+
     tokio::spawn(async move {
-        let sig = signal::ctrl_c().await;
-        if sig.is_ok() {
-            tracing::info!("Received Ctrl-C, shutting down gracefully...");
-            *shutdown.lock() = true;
-        }
-    });
-    
-    let shutdown_check = state.shutdown_signal.clone();
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            // Wait for shutdown signal
-            while !*shutdown_check.lock() {
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        let mut term_signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("Failed to bind SIGTERM handler");
+
+        tokio::select! {
+            _ = signal::ctrl_c() => {
+                tracing::info!("Received Ctrl-C, shutting down gracefully...");
             }
+            _ = term_signal.recv() => {
+                tracing::info!("Received SIGTERM, shutting down gracefully...");
+            }
+        }
+
+        *shutdown.lock() = true;
+        shutdown_notify_clone.notify_waiters();
+    });
+
+    let shutdown_check = shutdown_notify.clone();
+    let server = axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            shutdown_check.notified().await;
             tracing::info!("Shutting down server...");
-        })
-        .await
-        .unwrap();
-    
+        });
+
+    match tokio::time::timeout(tokio::time::Duration::from_secs(30), server).await {
+        Ok(res) => {
+            res.unwrap();
+            tracing::info!("Server shutdown completed within 30 seconds");
+        }
+        Err(_) => {
+            tracing::warn!("Graceful shutdown timed out after 30 seconds, forcing exit");
+        }
+    }
+
+    if let Err(e) = state.db.flush() {
+        tracing::error!("Failed to flush RocksDB on shutdown: {}", e);
+    } else {
+        tracing::info!("RocksDB flushed successfully on shutdown");
+    }
+
+    let metrics_dump = metrics::flush_metrics();
+    tracing::info!("Metrics flushed on shutdown, {} bytes", metrics_dump.len());
+
     tracing::info!("Server shutdown complete");
 }
 
