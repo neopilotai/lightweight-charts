@@ -81,9 +81,9 @@
   - [x] Unit test: verify incremental matches full calculation
   - [x] Benchmark: should be 50-100x faster
 
-- [ ] **Pre-allocate JSON buffers**
-  - [ ] Create `struct JsonBuffer` with pre-allocated `String`
-  - [ ] Reuse same buffer for each message (clear/reuse pattern)
+- [x] **Pre-allocate JSON buffers**
+  - [x] Create `struct JsonBuffer` with pre-allocated `String`
+  - [x] Reuse same buffer for each message (clear/reuse pattern)
   - [ ] Measure allocation count before/after (should drop to ~1%) ⚠️ SKIPPED
 
 **Files Changed**: `models/indicators.rs`, `ws/handler.rs`, `ws/binance_listener.rs`  
