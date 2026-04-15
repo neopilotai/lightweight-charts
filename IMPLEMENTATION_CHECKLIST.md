@@ -190,10 +190,11 @@
 
 ---
 
-### Sprint 2.4: Database Persistence (Days 4-5) ⏳ NOT IMPLEMENTED
+### Sprint 2.4: Database Persistence (Days 4-5) ✅ DONE
 
-- [ ] **Decision**: RocksDB vs PostgreSQL
-  - RocksDB requires long compilation (~30 min), skipped for MVP
+- [x] **Decision**: RocksDB vs PostgreSQL
+  - RocksDB chosen for embedded persistence and faster MVP rollout
+  - Persist candle history in `data/rocksdb`
 
 **Phase 2 Acceptance Criteria**:
 - [x] All errors logged as structured JSON
