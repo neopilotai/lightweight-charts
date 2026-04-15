@@ -58,6 +58,11 @@ lazy_static! {
         "binance_connected",
         "Whether connected to Binance (1 = yes, 0 = no)"
     ).unwrap();
+
+    pub static ref CIRCUIT_BREAKER_STATE: IntGauge = IntGauge::new(
+        "circuit_breaker_state",
+        "Circuit breaker state: 0=closed, 1=open, 2=half_open"
+    ).unwrap();
 }
 
 pub fn init_metrics() -> Result<(), Box<dyn std::error::Error>> {
@@ -70,6 +75,7 @@ pub fn init_metrics() -> Result<(), Box<dyn std::error::Error>> {
     REGISTRY.register(Box::new(SYMBOLS_TRACKED.clone()))?;
     REGISTRY.register(Box::new(BINANCE_RECONNECTS.clone()))?;
     REGISTRY.register(Box::new(BINANCE_CONNECTED.clone()))?;
+    REGISTRY.register(Box::new(CIRCUIT_BREAKER_STATE.clone()))?;
     Ok(())
 }
 

@@ -98,10 +98,35 @@ pub async fn metrics_handler() -> impl axum::response::IntoResponse {
         .unwrap()
 }
 
+#[derive(serde::Serialize)]
+pub struct ErrorEntry {
+    pub timestamp: u64,
+    pub error: String,
+    pub payload: String,
+}
+
+pub async fn diagnostics_errors() -> axum::Json<serde_json::Value> {
+    let errors = crate::ws::binance_listener::get_dead_letter_queue();
+    let error_rate = crate::ws::binance_listener::get_error_rate();
+    
+    let error_list: Vec<ErrorEntry> = errors.into_iter().map(|e| ErrorEntry {
+        timestamp: e.timestamp,
+        error: e.error,
+        payload: e.payload,
+    }).collect();
+    
+    axum::Json(serde_json::json!({
+        "error_count": error_list.len(),
+        "error_rate_percent": error_rate,
+        "errors": error_list,
+    }))
+}
+
 pub fn create_health_router(health_state: HealthState) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/ready", get(ready_check))
         .route("/metrics", get(metrics_handler))
+        .route("/api/diagnostics/errors", get(diagnostics_errors))
         .with_state(health_state)
 }
