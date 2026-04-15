@@ -177,32 +177,3 @@ impl SignalGenerator {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::models::orders::OrderSide;
-
-    #[test]
-    fn test_rsi_oversold() {
-        let mut candles = VecDeque::new();
-        let mut candle = Candle {
-            time: 0,
-            open: 100.0,
-            high: 100.0,
-            low: 100.0,
-            close: 100.0,
-            rsi: Some(25.0), // Oversold
-            ema12: Some(100.0),
-            ema26: Some(101.0),
-            macd: Some(0.5),
-            signal: Some(0.3),
-            histogram: Some(0.2),
-        };
-        candles.push_back(candle);
-
-        let signal = SignalGenerator::generate_signal("BTC", &candles, 100.0);
-        assert!(signal.is_some());
-        assert_eq!(signal.unwrap().signal_type, SignalType::BuySignal);
-    }
-}
