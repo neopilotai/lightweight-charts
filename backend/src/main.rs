@@ -15,32 +15,55 @@ mod models;
 mod routes;
 mod ws;
 mod services;
-mod channels;
 mod trading;
+mod channels;
+mod metrics;
+mod middleware;
 
 use routes::market::get_candles;
 use routes::trading::{TradingState, create_strategy_simple, list_strategies as list_strats, get_signals};
+use routes::health::{create_health_router, HealthState};
 use ws::handler::handle_socket;
-use channels::LockFreeChannel;
+use channels::MarketData;
 
 const MAX_CANDLES: usize = 500;
-const QUEUE_CAPACITY: usize = 10000;
 
 #[derive(Clone)]
 pub struct AppState {
     pub candles_cache: Arc<DashMap<String, VecDeque<crate::models::candle::Candle>>>,
-    pub market_channel: Arc<LockFreeChannel>,
+    pub client_senders: Arc<tokio::sync::Mutex<Vec<tokio::sync::mpsc::UnboundedSender<Arc<MarketData>>>>>,
+    pub sequence_tracker: Arc<parking_lot::Mutex<DashMap<String, u64>>>,
+    pub health_state: crate::routes::health::HealthState,
 }
 
 #[tokio::main]
 async fn main() {
-    // Create lock-free market data channel
-    let market_channel = Arc::new(LockFreeChannel::new(QUEUE_CAPACITY));
+    // Initialize tracing for structured logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(tracing::Level::INFO.into())
+        )
+        .init();
 
-    // Create app state with DashMap
+    tracing::info!("Starting lightweight-charts-backend v{}", env!("CARGO_PKG_VERSION"));
+
+    // Initialize Prometheus metrics
+    if let Err(e) = metrics::init_metrics() {
+        tracing::error!("Failed to initialize metrics: {}", e);
+    }
+    tracing::info!("Metrics initialized");
+
+    // Create health state
+    let health_state = HealthState::new();
+    let health_state_clone = health_state.clone();
+
+    // Create app state with DashMap and sequence tracker
     let state = AppState {
         candles_cache: Arc::new(DashMap::new()),
-        market_channel: Arc::clone(&market_channel),
+        client_senders: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+        sequence_tracker: Arc::new(parking_lot::Mutex::new(DashMap::new())),
+        health_state: health_state_clone,
     };
 
     // Create trading state
@@ -53,6 +76,7 @@ async fn main() {
     });
 
     let app = Router::new()
+        .merge(create_health_router(health_state))
         .route("/api/candles", get({
             let state = state.clone();
             move |query| get_candles(query, state)
@@ -75,7 +99,7 @@ async fn main() {
         }))
         .layer(CorsLayer::permissive());
 
-    println!("Server running at http://localhost:3000 [HFT Mode - Lock-Free]");
+    tracing::info!("Server running at http://localhost:3000");
 
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
