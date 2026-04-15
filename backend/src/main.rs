@@ -7,6 +7,7 @@ mod channels;
 mod metrics;
 mod middleware;
 mod auth;
+mod utils;
 
 use std::sync::Arc;
 use std::collections::VecDeque;
@@ -22,7 +23,7 @@ use tokio::net::TcpListener;
 use tower_http::cors::{CorsLayer, Any, AllowOrigin};
 use axum::http::HeaderValue;
 
-use routes::market::{get_candles, get_candles_rate_limited};
+use routes::market::get_candles_rate_limited;
 use routes::trading::{TradingState, create_strategy_simple, list_strategies as list_strats, get_signals};
 use routes::health::{create_health_router, HealthState};
 use routes::auth::create_auth_router;
