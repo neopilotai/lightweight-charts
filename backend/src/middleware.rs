@@ -8,20 +8,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
+#[derive(Clone)]
 pub struct RateLimiter {
     requests: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
     max_requests: usize,
     window_secs: u64,
-}
-
-impl Clone for RateLimiter {
-    fn clone(&self) -> Self {
-        Self {
-            requests: self.requests.clone(),
-            max_requests: self.max_requests,
-            window_secs: self.window_secs,
-        }
-    }
 }
 
 impl RateLimiter {
@@ -48,6 +39,10 @@ impl RateLimiter {
 
         timestamps.push(now);
         true
+    }
+
+    pub fn check_ip(&self, ip: &str) -> bool {
+        self.check(ip)
     }
 }
 

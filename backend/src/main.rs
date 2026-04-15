@@ -1,16 +1,3 @@
-// src/main.rs
-use axum::{
-    routing::get,
-    Router,
-    extract::ws::WebSocketUpgrade,
-    response::IntoResponse,
-};
-use tokio::net::TcpListener;
-use tower_http::cors::CorsLayer;
-use std::sync::Arc;
-use dashmap::DashMap;
-use std::collections::VecDeque;
-
 mod models;
 mod routes;
 mod ws;
@@ -21,13 +8,28 @@ mod metrics;
 mod middleware;
 mod auth;
 
-use routes::market::get_candles;
+use std::sync::Arc;
+use std::collections::VecDeque;
+use dashmap::DashMap;
+
+use axum::{
+    routing::get,
+    Router,
+    extract::ws::WebSocketUpgrade,
+    response::IntoResponse,
+};
+use tokio::net::TcpListener;
+use tower_http::cors::{CorsLayer, Any, AllowOrigin};
+use axum::http::HeaderValue;
+
+use routes::market::{get_candles, get_candles_rate_limited};
 use routes::trading::{TradingState, create_strategy_simple, list_strategies as list_strats, get_signals};
 use routes::health::{create_health_router, HealthState};
 use routes::auth::create_auth_router;
 use ws::handler::handle_socket;
 use channels::MarketData;
 use tokio::signal;
+use middleware::RateLimiter;
 
 const MAX_CANDLES: usize = 500;
 
@@ -38,6 +40,8 @@ pub struct AppState {
     pub sequence_tracker: Arc<parking_lot::Mutex<DashMap<String, u64>>>,
     pub health_state: crate::routes::health::HealthState,
     pub shutdown_signal: Arc<parking_lot::Mutex<bool>>,
+    pub candles_rate_limiter: Arc<middleware::RateLimiter>,
+    pub strategies_rate_limiter: Arc<middleware::RateLimiter>,
 }
 
 #[tokio::main]
@@ -69,6 +73,8 @@ async fn main() {
         sequence_tracker: Arc::new(parking_lot::Mutex::new(DashMap::new())),
         health_state: health_state_clone,
         shutdown_signal: Arc::new(parking_lot::Mutex::new(false)),
+        candles_rate_limiter: Arc::new(RateLimiter::new(1000, 1)),
+        strategies_rate_limiter: Arc::new(RateLimiter::new(100, 1)),
     };
 
     // Create trading state
@@ -80,12 +86,25 @@ async fn main() {
         ws::binance_listener::start_binance_listener(state_clone).await;
     });
 
+    let cors = if std::env::var("CORS_PERMISSIVE").is_ok() {
+        tracing::warn!("CORS is PERMISSIVE - only use in development!");
+        CorsLayer::permissive()
+    } else {
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list([
+                HeaderValue::from_static("https://trading.example.com"),
+                HeaderValue::from_static("https://app.example.com"),
+            ]))
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
+
     let app = Router::new()
         .merge(create_health_router(health_state))
         .merge(create_auth_router())
         .route("/api/candles", get({
             let state = state.clone();
-            move |query| get_candles(query, state)
+            move |query, connect_info| get_candles_rate_limited(query, state, connect_info)
         }))
         .route("/api/trading/strategies", axum::routing::post({
             let ts = trading_state.clone();
@@ -103,7 +122,7 @@ async fn main() {
             let state = state.clone();
             move |ws: WebSocketUpgrade, query| async move { ws_handler(ws, query, state).await }
         }))
-        .layer(CorsLayer::permissive());
+        .layer(cors);
 
     tracing::info!("Server running at http://localhost:3000");
 
