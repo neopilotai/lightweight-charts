@@ -219,12 +219,18 @@ pub async fn start_binance_listener(state: AppState) {
                                             high,
                                             low,
                                             close,
+                                            volume: 0.0,
                                             rsi: None,
                                             ema12: None,
                                             ema26: None,
                                             macd: None,
                                             signal: None,
                                             histogram: None,
+                                            bollinger_upper: None,
+                                            bollinger_middle: None,
+                                            bollinger_lower: None,
+                                            stoch_k: None,
+                                            stoch_d: None,
                                         };
                                         candles.push_back(new_candle);
                                         // Limit size
@@ -242,12 +248,18 @@ pub async fn start_binance_listener(state: AppState) {
                                         high,
                                         low,
                                         close,
+                                        volume: 0.0,
                                         rsi: None,
                                         ema12: None,
                                         ema26: None,
                                         macd: None,
                                         signal: None,
                                         histogram: None,
+                                        bollinger_upper: None,
+                                        bollinger_middle: None,
+                                        bollinger_lower: None,
+                                        stoch_k: None,
+                                        stoch_d: None,
                                     };
                                     candles.push_back(new_candle);
                                     // Update indicators for the first candle
