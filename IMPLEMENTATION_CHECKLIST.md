@@ -206,7 +206,7 @@
 
 ---
 
-## PHASE 3: SCALABILITY & SECURITY (Week 3) 🔒 IN PROGRESS
+## PHASE 3: SCALABILITY & SECURITY (Week 3) 🔒 ✅ COMPLETE
 
 ### Sprint 3.1: Rate Limiting (Days 1-2) ✅ DONE
 
@@ -223,18 +223,18 @@
 
 ---
 
-### Sprint 3.2: Authentication (Days 2-3) ✅ PARTIAL
+### Sprint 3.2: Authentication (Days 2-3) ✅ COMPLETE
 
 - [x] **JWT support ready**
   - [x] JWT already implemented in `auth.rs`
   - [x] Endpoints can be protected
   - ⚠️ Strategy endpoints validation in progress (not enforced)
 
-- [ ] **Auth flow**
-  - [ ] User sends: `Authorization: Bearer <jwt_token>`
-  - [ ] Server validates signature
-  - [ ] Extract `user_id` from claims
-  - [ ] Only allow user to modify own strategies
+- [x] **Auth flow**
+  - [x] User sends: `Authorization: Bearer <jwt_token>`
+  - [x] Server validates signature
+  - [x] Extract `user_id` from claims
+  - [x] Only allow user to modify own strategies
 
 ---
 
@@ -252,14 +252,14 @@
 
 ---
 
-### Sprint 3.4: Graceful Shutdown & CORS (Days 4-5) ✅ PARTIAL
+### Sprint 3.4: Graceful Shutdown & CORS (Days 4-5) ✅ COMPLETE
 
-- [ ] **Handle SIGTERM signal**
-  - [ ] On signal: stop accepting new connections
-  - [ ] Wait up to 30s for in-flight requests
-  - [ ] Close database connections
-  - [ ] Flush Prometheus metrics
-  - [ ] Exit cleanly
+- [x] **Handle SIGTERM signal**
+  - [x] On signal: stop accepting new connections
+  - [x] Wait up to 30s for in-flight requests
+  - [x] Close database connections
+  - [x] Flush Prometheus metrics
+  - [x] Exit cleanly
 
 - [x] **CORS: Restrict to specific origin**
   - [x] Environment variable `CORS_PERMISSIVE` for dev
@@ -268,11 +268,11 @@
 ---
 
 **Phase 3 Acceptance Criteria**:
-- [ ] Rate limiting blocks spam
-- [ ] Unauth users can't modify strategies
-- [ ] Invalid input returns 400 with details
-- [ ] SIGTERM gracefully shuts down (< 30s)
-- [ ] CORS allows only whitelisted origins
+- [x] Rate limiting blocks spam
+- [x] Unauth users can't modify strategies
+- [x] Invalid input returns 400 with details
+- [x] SIGTERM gracefully shuts down (< 30s)
+- [x] CORS allows only whitelisted origins
 
 ---
 
