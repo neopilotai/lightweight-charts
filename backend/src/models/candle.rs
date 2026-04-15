@@ -15,4 +15,9 @@ pub struct Candle {
     pub macd: Option<f64>,
     pub signal: Option<f64>,
     pub histogram: Option<f64>,
+    pub bollinger_upper: Option<f64>,
+    pub bollinger_middle: Option<f64>,
+    pub bollinger_lower: Option<f64>,
+    pub stoch_k: Option<f64>,
+    pub stoch_d: Option<f64>,
 }
