@@ -1,16 +1,17 @@
 // src/ws/handler.rs
 use axum::extract::ws::{WebSocket, Message};
-use futures::{SinkExt, StreamExt};
 use crate::AppState;
 use tokio::sync::mpsc;
+use std::fmt::Write;
 use std::sync::Arc;
 use crate::channels::MarketData;
+use crate::utils::JsonBuffer;
 
 pub async fn handle_socket(mut socket: WebSocket, symbol: String, state: AppState) {
     let symbol_lower = symbol.to_lowercase();
     
     // Create a new channel for this client
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Arc<MarketData>>();
+    let (tx, mut rx) = mpsc::unbounded_channel::<Arc<MarketData>>();
     
     // Add this client's sender to the list of active clients
     {
@@ -18,6 +19,8 @@ pub async fn handle_socket(mut socket: WebSocket, symbol: String, state: AppStat
         client_senders.push(tx);
     }
     
+    let mut json_buffer = JsonBuffer::default();
+
     loop {
         tokio::select! {
             // Receive market data from our dedicated channel
@@ -35,35 +38,33 @@ pub async fn handle_socket(mut socket: WebSocket, symbol: String, state: AppStat
                             } else {
                                 None
                             };
-                            
-                            // If we have cached candle data, use it; otherwise fall back to basic market data
-                            let json_msg = if let Some(candle) = latest_candle {
-                                serde_json::json!({
-                                    "time": candle.time,
-                                    "open": candle.open,
-                                    "high": candle.high,
-                                    "low": candle.low,
-                                    "close": candle.close,
-                                    "rsi": candle.rsi,
-                                    "histogram": candle.histogram,
-                                    "macd_line": candle.signal,
-                                    "sequence": market_data.sequence
-                                })
+
+                            let buf = json_buffer.as_mut_string();
+                            buf.clear();
+
+                            fn write_optional(buf: &mut String, value: Option<f64>) -> std::fmt::Result {
+                                match value {
+                                    Some(v) => write!(buf, "{}", v),
+                                    None => {
+                                        buf.push_str("null");
+                                        Ok(())
+                                    }
+                                }
+                            }
+
+                            if let Some(candle) = latest_candle {
+                                write!(buf, "{{\"time\":{},\"open\":{},\"high\":{},\"low\":{},\"close\":{},\"rsi\":", candle.time, candle.open, candle.high, candle.low, candle.close).unwrap();
+                                write_optional(buf, candle.rsi).unwrap();
+                                write!(buf, ",\"histogram\":").unwrap();
+                                write_optional(buf, candle.histogram).unwrap();
+                                write!(buf, ",\"macd_line\":").unwrap();
+                                write_optional(buf, candle.signal).unwrap();
+                                write!(buf, ",\"sequence\":{} }}", market_data.sequence).unwrap();
                             } else {
-                                serde_json::json!({
-                                    "time": market_data.time,
-                                    "open": market_data.open,
-                                    "high": market_data.high,
-                                    "low": market_data.low,
-                                    "close": market_data.close,
-                                    "rsi": serde_json::Value::Null,
-                                    "histogram": serde_json::Value::Null,
-                                    "macd_line": serde_json::Value::Null,
-                                    "sequence": market_data.sequence
-                                })
-                            };
-                            
-                            if socket.send(Message::Text(json_msg.to_string())).await.is_err() {
+                                write!(buf, "{{\"time\":{},\"open\":{},\"high\":{},\"low\":{},\"close\":{},\"rsi\":null,\"histogram\":null,\"macd_line\":null,\"sequence\":{} }}", market_data.time, market_data.open, market_data.high, market_data.low, market_data.close, market_data.sequence).unwrap();
+                            }
+
+                            if socket.send(Message::Text(buf.clone())).await.is_err() {
                                 return;
                             }
                         }
