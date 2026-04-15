@@ -25,6 +25,8 @@ pub struct StrategyConfig {
     pub take_profit_pct: f64, // Take profit percentage
     pub max_positions: usize, // Max concurrent positions
     pub position_size: f64,   // Fixed position size (if 0, use risk_percent)
+    #[serde(skip_serializing)]
+    pub owner_id: Option<String>,
 }
 
 impl StrategyConfig {
@@ -40,6 +42,7 @@ impl StrategyConfig {
             take_profit_pct: 5.0,
             max_positions: 1,
             position_size: 0.0,
+            owner_id: None,
         }
     }
 }
@@ -300,6 +303,61 @@ impl StrategyManager {
     pub fn get_all_stats(&self) -> Vec<(String, usize, usize, f64, f64)> {
         self.strategies
             .values()
+            .map(|s| {
+                let (total, wins, win_rate, pnl) = s.stats();
+                (s.config.name.clone(), total, wins, win_rate, pnl)
+            })
+            .collect()
+    }
+
+    pub fn list_user_strategies(&self, user_id: &str) -> Vec<StrategyConfig> {
+        self.strategies
+            .values()
+            .filter(|s| s.config.owner_id.as_deref() == Some(user_id))
+            .map(|s| s.config.clone())
+            .collect()
+    }
+
+    pub fn get_user_strategy(&self, id: &str, user_id: &str) -> Option<&Strategy> {
+        self.strategies
+            .get(id)
+            .filter(|strategy| strategy.config.owner_id.as_deref() == Some(user_id))
+    }
+
+    pub fn enable_strategy_for_user(&mut self, id: &str, user_id: &str) -> bool {
+        if let Some(strategy) = self.strategies.get_mut(id) {
+            if strategy.config.owner_id.as_deref() == Some(user_id) {
+                strategy.config.enabled = true;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn disable_strategy_for_user(&mut self, id: &str, user_id: &str) -> bool {
+        if let Some(strategy) = self.strategies.get_mut(id) {
+            if strategy.config.owner_id.as_deref() == Some(user_id) {
+                strategy.config.enabled = false;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn remove_strategy_for_user(&mut self, id: &str, user_id: &str) -> bool {
+        if let Some(strategy) = self.strategies.get(id) {
+            if strategy.config.owner_id.as_deref() == Some(user_id) {
+                self.strategies.remove(id);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn get_user_stats(&self, user_id: &str) -> Vec<(String, usize, usize, f64, f64)> {
+        self.strategies
+            .values()
+            .filter(|s| s.config.owner_id.as_deref() == Some(user_id))
             .map(|s| {
                 let (total, wins, win_rate, pnl) = s.stats();
                 (s.config.name.clone(), total, wins, win_rate, pnl)
