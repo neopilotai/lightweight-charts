@@ -1,10 +1,13 @@
 // src/routes/trading.rs
 use axum::{
     extract::{Query, State, Json},
+    http::{HeaderMap, StatusCode},
     routing::{get, post},
+    response::IntoResponse,
     Router,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::Mutex;
@@ -121,8 +124,15 @@ pub struct SignalResponse {
 // Handlers
 pub async fn create_strategy(
     State(trading_state): State<TradingState>,
+    headers: HeaderMap,
     Json(req): Json<CreateStrategyRequest>,
-) -> Json<StrategyResponse> {
+) -> Result<Json<StrategyResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let user_id = crate::auth::require_user_id(&headers)?;
+
+    if let Err(e) = req.validate() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": e}))));
+    }
+
     let strategy_type = match req.strategy_type.as_str() {
         "moving_average_crossover" => StrategyType::MovingAverageCrossover,
         "rsi_momentum" => StrategyType::RSIMomentum,
@@ -132,6 +142,7 @@ pub async fn create_strategy(
     };
 
     let mut config = StrategyConfig::new(req.name.clone(), strategy_type, req.symbol.clone());
+    config.owner_id = Some(user_id.clone());
 
     if let Some(risk) = req.risk_percent {
         config.risk_percent = risk;
@@ -152,17 +163,25 @@ pub async fn create_strategy(
         .lock()
         .add_strategy(config.clone());
 
-    Json(StrategyResponse {
+    Ok(Json(StrategyResponse {
         id,
         name: req.name,
         enabled: true,
         config,
-    })
+    }))
 }
 
 pub async fn list_strategies(
     State(trading_state): State<TradingState>,
-) -> Json<Vec<StrategyConfig>> {
+    headers: HeaderMap,
+) -> Result<Json<Vec<StrategyConfig>>, (StatusCode, Json<serde_json::Value>)> {
+    let user_id = crate::auth::require_user_id(&headers)?;
+    let strategies = trading_state
+        .strategy_manager
+        .lock()
+        .list_user_strategies(&user_id);
+    Ok(Json(strategies))
+}
     let strategies = trading_state
         .strategy_manager
         .lock()
@@ -172,73 +191,101 @@ pub async fn list_strategies(
 
 pub async fn get_strategy(
     State(trading_state): State<TradingState>,
+    headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
-) -> Json<Option<StrategyConfig>> {
+) -> Result<Json<Option<StrategyConfig>>, (StatusCode, Json<serde_json::Value>)> {
+    let user_id = crate::auth::require_user_id(&headers)?;
+
     if let Some(id) = params.get("id") {
-        if let Some(strategy) = trading_state.strategy_manager.lock().get_strategy(id) {
-            return Json(Some(strategy.config.clone()));
+        if let Some(strategy) = trading_state
+            .strategy_manager
+            .lock()
+            .get_user_strategy(id, &user_id)
+        {
+            return Ok(Json(Some(strategy.config.clone())));
         }
     }
-    Json(None)
+
+    Ok(Json(None))
 }
 
 pub async fn enable_strategy(
     State(trading_state): State<TradingState>,
+    headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
-) -> Json<serde_json::Value> {
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let user_id = crate::auth::require_user_id(&headers)?;
     if let Some(id) = params.get("id") {
-        trading_state
+        if trading_state
             .strategy_manager
             .lock()
-            .enable_strategy(id);
-        return Json(serde_json::json!({"status": "enabled"}));
+            .enable_strategy_for_user(id, &user_id)
+        {
+            return Ok(Json(json!({"status": "enabled"})));
+        }
+        return Err((StatusCode::FORBIDDEN, Json(json!({"error": "Unauthorized or unknown strategy"}))));
     }
-    Json(serde_json::json!({"error": "No ID provided"}))
+    Err((StatusCode::BAD_REQUEST, Json(json!({"error": "No ID provided"}))))
 }
 
 pub async fn disable_strategy(
     State(trading_state): State<TradingState>,
+    headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
-) -> Json<serde_json::Value> {
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let user_id = crate::auth::require_user_id(&headers)?;
     if let Some(id) = params.get("id") {
-        trading_state
+        if trading_state
             .strategy_manager
             .lock()
-            .disable_strategy(id);
-        return Json(serde_json::json!({"status": "disabled"}));
+            .disable_strategy_for_user(id, &user_id)
+        {
+            return Ok(Json(json!({"status": "disabled"})));
+        }
+        return Err((StatusCode::FORBIDDEN, Json(json!({"error": "Unauthorized or unknown strategy"}))));
     }
-    Json(serde_json::json!({"error": "No ID provided"}))
+    Err((StatusCode::BAD_REQUEST, Json(json!({"error": "No ID provided"}))))
 }
 
 pub async fn delete_strategy(
     State(trading_state): State<TradingState>,
+    headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
-) -> Json<serde_json::Value> {
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let user_id = crate::auth::require_user_id(&headers)?;
     if let Some(id) = params.get("id") {
-        trading_state
+        if trading_state
             .strategy_manager
             .lock()
-            .remove_strategy(id);
-        return Json(serde_json::json!({"status": "deleted"}));
+            .remove_strategy_for_user(id, &user_id)
+        {
+            return Ok(Json(json!({"status": "deleted"})));
+        }
+        return Err((StatusCode::FORBIDDEN, Json(json!({"error": "Unauthorized or unknown strategy"}))));
     }
-    Json(serde_json::json!({"error": "No ID provided"}))
+    Err((StatusCode::BAD_REQUEST, Json(json!({"error": "No ID provided"}))))
 }
 
 pub async fn get_strategy_stats(
     State(trading_state): State<TradingState>,
-) -> Json<Vec<(String, usize, usize, f64, f64)>> {
+    headers: HeaderMap,
+) -> Result<Json<Vec<(String, usize, usize, f64, f64)>>, (StatusCode, Json<serde_json::Value>)> {
+    let user_id = crate::auth::require_user_id(&headers)?;
     let stats = trading_state
         .strategy_manager
         .lock()
-        .get_all_stats();
-    Json(stats)
+        .get_user_stats(&user_id);
+    Ok(Json(stats))
 }
 
 pub async fn run_backtest(
     State(_trading_state): State<TradingState>,
     State(_app_state): State<AppState>,
+    headers: HeaderMap,
     Json(_req): Json<BacktestRequest>,
-) -> Json<BacktestResponse> {
+) -> Result<Json<BacktestResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let _user_id = crate::auth::require_user_id(&headers)?;
+
     // Placeholder - in production would use actual candle data
     let result = BacktestResponse {
         total_trades: 0,
@@ -253,14 +300,16 @@ pub async fn run_backtest(
         max_drawdown: 0.0,
         final_balance: 0.0,
     };
-    Json(result)
+    Ok(Json(result))
 }
 
 pub async fn get_signals(
     State(trading_state): State<TradingState>,
-) -> Json<Vec<Signal>> {
+    headers: HeaderMap,
+) -> Result<Json<Vec<Signal>>, (StatusCode, Json<serde_json::Value>)> {
+    let _user_id = crate::auth::require_user_id(&headers)?;
     let signals = trading_state.signals.lock().clone();
-    Json(signals)
+    Ok(Json(signals))
 }
 
 pub fn create_router(trading_state: TradingState) -> Router<TradingState> {
@@ -279,11 +328,13 @@ pub fn create_router(trading_state: TradingState) -> Router<TradingState> {
 // Simpler version that works with current AppState
 pub async fn create_strategy_simple(
     State(trading_state): State<TradingState>,
+    headers: HeaderMap,
     req: axum::extract::Json<CreateStrategyRequest>,
-) -> Json<StrategyResponse> {    
-    // Validate request
+) -> Result<Json<StrategyResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let user_id = crate::auth::require_user_id(&headers)?;
+
     if let Err(e) = req.0.validate() {
-        panic!("Invalid request: {}", e);
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"error": e}))));
     }
     
     let strategy_type = match req.0.strategy_type.as_str() {
@@ -295,6 +346,7 @@ pub async fn create_strategy_simple(
     };
 
     let mut config = StrategyConfig::new(req.0.name.clone(), strategy_type, req.0.symbol.clone());
+    config.owner_id = Some(user_id.clone());
 
     if let Some(risk) = req.0.risk_percent {
         config.risk_percent = risk;
@@ -315,10 +367,10 @@ pub async fn create_strategy_simple(
         .lock()
         .add_strategy(config.clone());
 
-    Json(StrategyResponse {
+    Ok(Json(StrategyResponse {
         id,
         name: req.0.name,
         enabled: true,
         config,
-    })
+    }))
 }
