@@ -379,6 +379,7 @@ fn calculate_macd_custom(
     macd_values
 }
 
+#[derive(Clone)]
 struct BollingerValue {
     upper: Option<f64>,
     middle: Option<f64>,
@@ -418,6 +419,7 @@ fn calculate_bollinger_bands(
     bb_values
 }
 
+#[derive(Clone)]
 struct StochasticValue {
     k: Option<f64>,
     d: Option<f64>,
