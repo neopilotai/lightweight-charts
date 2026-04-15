@@ -130,11 +130,11 @@ async fn test_slow_client_isolation() {
 #[tokio::test]
 async fn test_client_disconnect_cleanup() {
     // Test that client disconnect cleans up connections
-    let (tx, rx) = mpsc::unbounded_channel::<String>();
-    
+    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+
     // Drop the sender (simulating client disconnect)
     drop(tx);
-    
+
     // Receiver should immediately return None
     assert_eq!(rx.recv().await, None);
 }
