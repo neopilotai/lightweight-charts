@@ -8,8 +8,10 @@ mod metrics;
 mod middleware;
 mod auth;
 mod utils;
+mod db;
 
 use std::sync::Arc;
+use db::DbStore;
 use std::collections::VecDeque;
 use dashmap::DashMap;
 
@@ -43,6 +45,7 @@ pub struct AppState {
     pub shutdown_signal: Arc<parking_lot::Mutex<bool>>,
     pub candles_rate_limiter: Arc<middleware::RateLimiter>,
     pub strategies_rate_limiter: Arc<middleware::RateLimiter>,
+    pub db: Arc<DbStore>,
 }
 
 #[tokio::main]
@@ -67,6 +70,8 @@ async fn main() {
     let health_state = HealthState::new();
     let health_state_clone = health_state.clone();
 
+    let db = Arc::new(DbStore::open("data/rocksdb").expect("Failed to open RocksDB storage"));
+
     // Create app state with DashMap and sequence tracker
     let state = AppState {
         candles_cache: Arc::new(DashMap::new()),
@@ -76,7 +81,20 @@ async fn main() {
         shutdown_signal: Arc::new(parking_lot::Mutex::new(false)),
         candles_rate_limiter: Arc::new(RateLimiter::new(1000, 1)),
         strategies_rate_limiter: Arc::new(RateLimiter::new(100, 1)),
+        db: db.clone(),
     };
+
+    if let Ok(symbols) = db.list_symbols() {
+        for symbol in symbols {
+            if let Ok(candles) = db.load_candle_history(&symbol) {
+                if !candles.is_empty() {
+                    state.candles_cache.insert(symbol.clone(), VecDeque::from(candles.clone()));
+                    state.health_state.update_cache_size(&symbol, candles.len());
+                    tracing::info!(symbol = %symbol, count = candles.len(), "Loaded candle history from persistence");
+                }
+            }
+        }
+    }
 
     // Create trading state
     let trading_state = TradingState::new();
