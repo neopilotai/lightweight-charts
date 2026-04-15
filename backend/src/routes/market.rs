@@ -183,3 +183,48 @@ pub async fn get_order_book(
         Err(_) => Err(axum::http::StatusCode::SERVICE_UNAVAILABLE),
     }
 }
+
+#[derive(serde::Serialize)]
+pub struct Trade {
+    pub id: u64,
+    pub price: f64,
+    pub quantity: f64,
+    pub time: u64,
+    pub is_buyer_maker: bool,
+}
+
+pub async fn get_recent_trades(
+    Query(params): Query<MarketQuery>,
+) -> Result<Json<Vec<Trade>>, axum::http::StatusCode> {
+    let symbol = params.symbol.unwrap_or_else(|| "btcusdt".to_string()).to_uppercase();
+    
+    let url = format!("https://api.binance.com/api/v3/trades?symbol={}&limit=50", symbol);
+    
+    match reqwest::get(&url).await {
+        Ok(response) => {
+            #[derive(Deserialize)]
+            struct BinanceTrade {
+                id: u64,
+                price: String,
+                qty: String,
+                time: u64,
+                is_buyer_maker: bool,
+            }
+            
+            match response.json::<Vec<BinanceTrade>>().await {
+                Ok(trades) => {
+                    let result: Vec<Trade> = trades.into_iter().map(|t| Trade {
+                        id: t.id,
+                        price: t.price.parse().unwrap_or(0.0),
+                        quantity: t.qty.parse().unwrap_or(0.0),
+                        time: t.time / 1000,
+                        is_buyer_maker: t.is_buyer_maker,
+                    }).collect();
+                    Ok(Json(result))
+                }
+                Err(_) => Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
+            }
+        }
+        Err(_) => Err(axum::http::StatusCode::SERVICE_UNAVAILABLE),
+    }
+}

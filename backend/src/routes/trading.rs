@@ -22,13 +22,15 @@ use crate::models::orders::Signal;
 pub struct TradingState {
     pub strategy_manager: Arc<Mutex<StrategyManager>>,
     pub signals: Arc<Mutex<Vec<Signal>>>,
+    pub app_state: crate::AppState,
 }
 
 impl TradingState {
-    pub fn new() -> Self {
+    pub fn new(app_state: crate::AppState) -> Self {
         TradingState {
             strategy_manager: Arc::new(Mutex::new(StrategyManager::new())),
             signals: Arc::new(Mutex::new(Vec::new())),
+            app_state,
         }
     }
 }
@@ -93,24 +95,39 @@ pub struct StrategyResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct BacktestRequest {
-    pub strategy_id: String,
+    pub dsl: String,
+    pub buy_condition: String,
+    pub sell_condition: String,
     pub symbol: String,
-    pub initial_balance: f64,
 }
 
 #[derive(Debug, Serialize)]
 pub struct BacktestResponse {
     pub total_trades: usize,
-    pub winning_trades: usize,
-    pub losing_trades: usize,
     pub win_rate: f64,
-    pub total_pnl: f64,
-    pub total_return_pct: f64,
-    pub avg_pnl: f64,
-    pub max_pnl: f64,
-    pub min_pnl: f64,
+    pub total_profit: f64,
     pub max_drawdown: f64,
-    pub final_balance: f64,
+    pub trades: Vec<crate::backtest::types::Trade>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OptimizerRequest {
+    pub dsl: String,
+    pub symbol: String,
+    pub population_size: Option<usize>,
+    pub generations: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OptimizerResponse {
+    pub rsi_period: usize,
+    pub buy_condition: String,
+    pub sell_condition: String,
+    pub score: f64,
+    pub total_trades: usize,
+    pub win_rate: f64,
+    pub total_profit: f64,
+    pub max_drawdown: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -181,12 +198,6 @@ pub async fn list_strategies(
         .lock()
         .list_user_strategies(&user_id);
     Ok(Json(strategies))
-}
-    let strategies = trading_state
-        .strategy_manager
-        .lock()
-        .list_strategies();
-    Json(strategies)
 }
 
 pub async fn get_strategy(
@@ -279,28 +290,85 @@ pub async fn get_strategy_stats(
 }
 
 pub async fn run_backtest(
-    State(_trading_state): State<TradingState>,
-    State(_app_state): State<AppState>,
+    State(trading_state): State<TradingState>,
     headers: HeaderMap,
-    Json(_req): Json<BacktestRequest>,
+    Json(req): Json<BacktestRequest>,
 ) -> Result<Json<BacktestResponse>, (StatusCode, Json<serde_json::Value>)> {
     let _user_id = crate::auth::require_user_id(&headers)?;
 
-    // Placeholder - in production would use actual candle data
-    let result = BacktestResponse {
-        total_trades: 0,
-        winning_trades: 0,
-        losing_trades: 0,
-        win_rate: 0.0,
-        total_pnl: 0.0,
-        total_return_pct: 0.0,
-        avg_pnl: 0.0,
-        max_pnl: 0.0,
-        min_pnl: 0.0,
-        max_drawdown: 0.0,
-        final_balance: 0.0,
+    // Parse DSL
+    let def: crate::indicator::dsl::IndicatorDef = serde_json::from_str(&req.dsl)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid DSL: {}", e)}))))?;
+
+    // Compile indicator
+    let compiled = crate::indicator::compiler::compile(def)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Compile error: {}", e)}))))?;
+
+    // Get candles
+    let candles = trading_state.app_state.candles_cache.get(&req.symbol)
+        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "No candles for symbol"}))))?;
+
+    let candles_vec: Vec<_> = candles.iter().cloned().collect();
+
+    // Create indicator engine
+    let indicator = crate::indicator::engine::IndicatorEngine::new(compiled);
+
+    // Run backtest
+    let result = crate::backtest::engine::run_backtest(
+        &candles_vec,
+        indicator,
+        &req.buy_condition,
+        &req.sell_condition,
+    );
+
+    let response = BacktestResponse {
+        total_trades: result.total_trades,
+        win_rate: result.win_rate,
+        total_profit: result.total_profit,
+        max_drawdown: result.max_drawdown,
+        trades: result.trades,
     };
-    Ok(Json(result))
+
+    Ok(Json(response))
+}
+
+pub async fn run_optimizer(
+    State(trading_state): State<TradingState>,
+    headers: HeaderMap,
+    Json(req): Json<OptimizerRequest>,
+) -> Result<Json<OptimizerResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let _user_id = crate::auth::require_user_id(&headers)?;
+
+    let def: crate::indicator::dsl::IndicatorDef = serde_json::from_str(&req.dsl)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Invalid DSL: {}", e)}))))?;
+
+    let compiled = crate::indicator::compiler::compile(def)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({"error": format!("Compile error: {}", e)}))))?;
+
+    let candles = trading_state.app_state.candles_cache.get(&req.symbol)
+        .ok_or((StatusCode::NOT_FOUND, Json(json!({"error": "No candles for symbol"}))))?;
+
+    let candles_vec: Vec<_> = candles.iter().cloned().collect();
+    let population_size = req.population_size.unwrap_or(50).clamp(10, 200);
+    let generations = req.generations.unwrap_or(20).clamp(5, 100);
+
+    let result = crate::optimizer::runner::run_optimizer(
+        &candles_vec,
+        &compiled,
+        population_size,
+        generations,
+    );
+
+    Ok(Json(OptimizerResponse {
+        rsi_period: result.best_genome.rsi_period,
+        buy_condition: result.buy_condition,
+        sell_condition: result.sell_condition,
+        score: result.score,
+        total_trades: result.backtest.total_trades,
+        win_rate: result.backtest.win_rate,
+        total_profit: result.backtest.total_profit,
+        max_drawdown: result.backtest.max_drawdown,
+    }))
 }
 
 pub async fn get_signals(
@@ -320,6 +388,8 @@ pub fn create_router(trading_state: TradingState) -> Router<TradingState> {
         .route("/strategies/disable", post(disable_strategy))
         .route("/strategies/delete", post(delete_strategy))
         .route("/strategies/stats", get(get_strategy_stats))
+        .route("/backtest", post(run_backtest))
+        .route("/optimizer", post(run_optimizer))
         .route("/signals", get(get_signals))
         .with_state(trading_state)
 }

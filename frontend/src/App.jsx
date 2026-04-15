@@ -5,6 +5,8 @@ import SignalsPanel from './components/SignalsPanel'
 import PortfolioStatsPanel from './components/PortfolioStatsPanel'
 import SymbolSelector from './components/SymbolSelector'
 import MarketDepth from './components/MarketDepth'
+import TradesPanel from './components/TradesPanel'
+import OrderPanel from './components/OrderPanel'
 import './styles/App.css'
 
 export default function App() {
@@ -59,6 +61,16 @@ export default function App() {
           {/* Market Depth Panel */}
           <div className="panel market-depth-panel">
             <MarketDepth symbol={selectedSymbol} />
+          </div>
+
+          {/* Trades Panel */}
+          <div className="panel trades-panel">
+            <TradesPanel symbol={selectedSymbol} />
+          </div>
+
+          {/* Order Panel */}
+          <div className="panel order-panel">
+            <OrderPanel />
           </div>
 
           {/* Signals Panel */}

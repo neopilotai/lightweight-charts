@@ -1,8 +1,11 @@
 mod models;
+mod indicator;
 mod routes;
 mod ws;
 mod services;
 mod trading;
+mod backtest;
+mod optimizer;
 mod channels;
 mod metrics;
 mod middleware;
@@ -25,11 +28,11 @@ use axum::http::HeaderValue;
 use tokio::{net::TcpListener, sync::Notify};
 use tower_http::cors::{CorsLayer, Any, AllowOrigin};
 
-use routes::market::{get_candles_rate_limited, get_order_book};
+use routes::market::{get_candles_rate_limited, get_order_book, get_recent_trades};
 use routes::trading::{TradingState, create_router};
 use routes::health::{create_health_router, HealthState};
 use routes::auth::create_auth_router;
-use ws::handler::handle_socket;
+use ws::handler::{handle_socket, SubscriptionPreferences};
 use channels::MarketData;
 use tokio::signal;
 use middleware::RateLimiter;
@@ -97,7 +100,7 @@ async fn main() {
     }
 
     // Create trading state
-    let trading_state = TradingState::new();
+    let trading_state = TradingState::new(state.clone());
 
     // Start Binance WebSocket listener for multiple symbols
     let state_clone = state.clone();
@@ -127,6 +130,7 @@ async fn main() {
             move |query, connect_info| get_candles_rate_limited(query, state, connect_info)
         }))
         .route("/api/orderbook", get(get_order_book))
+        .route("/api/trades", get(get_recent_trades))
         .route("/ws", get({
             let state = state.clone();
             move |ws: WebSocketUpgrade, query| async move { ws_handler(ws, query, state).await }
@@ -194,5 +198,6 @@ async fn ws_handler(
     state: AppState
 ) -> impl IntoResponse {
     let symbol = params.get("symbol").cloned().unwrap_or_else(|| "btcusdt".to_string());
-    ws.on_upgrade(move |socket| handle_socket(socket, symbol, state))
+    let subscription = SubscriptionPreferences::from_query(symbol.clone(), &params);
+    ws.on_upgrade(move |socket| handle_socket(socket, subscription, state))
 }

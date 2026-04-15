@@ -20,6 +20,16 @@ const DEFAULT_PARAMS = {
   bbStd: 2,
 }
 
+const PLAN_ACCESS = {
+  free: ['rsi', 'ema'],
+  pro: ['rsi', 'ema'],
+  elite: ['rsi', 'ema', 'macd'],
+}
+
+function isIndicatorAllowedByPlan(plan, indicator) {
+  return PLAN_ACCESS[plan]?.includes(indicator)
+}
+
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -61,11 +71,15 @@ export default function ChartPanel({ symbol, signals = [] }) {
     const saved = loadState()
     return saved?.params || DEFAULT_PARAMS
   })
+  const [plan, setPlan] = useState(() => {
+    const saved = loadState()
+    return saved?.plan || 'elite'
+  })
   const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
-    saveState({ symbol, timeframe, indicators, params })
-  }, [symbol, timeframe, indicators, params])
+    saveState({ symbol, timeframe, indicators, params, plan })
+  }, [symbol, timeframe, indicators, params, plan])
 
   const loadChartData = useCallback(async (sym, tf, candleSeries, volumeSeries, emaSeries, bbSeries, rsiSeries, macdSeries, signalLine) => {
     try {
@@ -208,23 +222,45 @@ export default function ChartPanel({ symbol, signals = [] }) {
 
   // WebSocket for real-time updates
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:3000/ws?symbol=${symbol}`)
+    const requestedIndicators = Object.entries(indicators)
+      .filter(([indicator, enabled]) => enabled && isIndicatorAllowedByPlan(plan, indicator))
+      .map(([indicator]) => indicator)
+      .join(',')
+
+    const queryParams = new URLSearchParams({ symbol, plan })
+    if (requestedIndicators) {
+      queryParams.set('indicators', requestedIndicators)
+    }
+
+    const ws = new WebSocket(`ws://localhost:3000/ws?${queryParams.toString()}`)
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
         candleSeriesRef.current?.update({ time: data.time, open: data.open, high: data.high, low: data.low, close: data.close })
         volumeSeriesRef.current?.update({ time: data.time, value: data.volume || 0, color: data.close >= data.open ? '#26a69a40' : '#ef535040' })
-        rsiSeriesRef.current?.data.rsi !== null && rsiSeriesRef.current?.update({ time: data.time, value: data.rsi })
-        if (macdSeriesRef.current && data.histogram !== null) {
-          macdSeriesRef.current.update({ time: data.time, value: data.histogram })
-          signalLineRef.current?.update({ time: data.time, value: data.macd_line })
+
+        if (data.rsi !== undefined && data.rsi !== null) {
+          rsiSeriesRef.current?.update({ time: data.time, value: data.rsi })
+        }
+
+        if (data.ema12 !== undefined && data.ema12 !== null) {
+          emaSeriesRef.current?.update({ time: data.time, value: data.ema12 })
+        }
+
+        if (data.ema26 !== undefined && data.ema26 !== null) {
+          emaSeriesRef.current?.update({ time: data.time, value: data.ema26 })
+        }
+
+        if (data.histogram !== undefined && data.histogram !== null) {
+          macdSeriesRef.current?.update({ time: data.time, value: data.histogram })
+          signalLineRef.current?.update({ time: data.time, value: data.signal })
         }
       } catch (error) {
         console.error('WebSocket error:', error)
       }
     }
     return () => ws.close()
-  }, [symbol])
+  }, [symbol, plan, indicators])
 
   // Update signal markers when signals change
   useEffect(() => {
@@ -241,12 +277,28 @@ export default function ChartPanel({ symbol, signals = [] }) {
   }, [signals])
 
   const toggleIndicator = (indicator) => {
+    if (!isIndicatorAllowedByPlan(plan, indicator)) {
+      return
+    }
+
     setIndicators(prev => ({ ...prev, [indicator]: !prev[indicator] }))
   }
 
   const updateParam = (key, value) => {
     setParams(prev => ({ ...prev, [key]: value }))
   }
+
+  useEffect(() => {
+    setIndicators(prev => {
+      const next = { ...prev }
+      Object.keys(next).forEach(key => {
+        if (!isIndicatorAllowedByPlan(plan, key)) {
+          next[key] = false
+        }
+      })
+      return next
+    })
+  }, [plan])
 
   return (
     <div className="chart-panel">
@@ -260,22 +312,53 @@ export default function ChartPanel({ symbol, signals = [] }) {
               </button>
             ))}
           </div>
+          <div className="plan-selector">
+            {[ 'free', 'pro', 'elite' ].map(option => (
+              <button
+                key={option}
+                className={`plan-btn ${plan === option ? 'active' : ''}`}
+                onClick={() => setPlan(option)}
+              >
+                {option.toUpperCase()}
+              </button>
+            ))}
+          </div>
           <div className="indicator-toggles">
             <label className="toggle-label">
-              <input type="checkbox" checked={indicators.rsi} onChange={() => toggleIndicator('rsi')} />
-              RSI
+              <input
+                type="checkbox"
+                checked={indicators.rsi}
+                disabled={!isIndicatorAllowedByPlan(plan, 'rsi')}
+                onChange={() => toggleIndicator('rsi')}
+              />
+              RSI {plan === 'free' ? '(PRO)' : ''}
             </label>
             <label className="toggle-label">
-              <input type="checkbox" checked={indicators.macd} onChange={() => toggleIndicator('macd')} />
-              MACD
+              <input
+                type="checkbox"
+                checked={indicators.macd}
+                disabled={!isIndicatorAllowedByPlan(plan, 'macd')}
+                onChange={() => toggleIndicator('macd')}
+              />
+              MACD {plan !== 'elite' ? '(ELITE)' : ''}
             </label>
             <label className="toggle-label">
-              <input type="checkbox" checked={indicators.ema} onChange={() => toggleIndicator('ema')} />
-              EMA
+              <input
+                type="checkbox"
+                checked={indicators.ema}
+                disabled={!isIndicatorAllowedByPlan(plan, 'ema')}
+                onChange={() => toggleIndicator('ema')}
+              />
+              EMA {plan === 'free' ? '(PRO)' : ''}
             </label>
             <label className="toggle-label">
-              <input type="checkbox" checked={indicators.bollinger} onChange={() => toggleIndicator('bollinger')} />
-              BB
+              <input
+                type="checkbox"
+                checked={indicators.bollinger}
+                disabled={true}
+                onChange={() => toggleIndicator('bollinger')}
+              />
+              BB (future)
             </label>
             <button className="settings-btn" onClick={() => setShowSettings(!showSettings)}>⚙️</button>
           </div>
