@@ -32,6 +32,7 @@ tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 prometheus = "0.13"
 lazy_static = "1.4"
 jsonwebtoken = "9.2"
+rocksdb = "0.20"
 
 [profile.release]
 opt-level = 3
