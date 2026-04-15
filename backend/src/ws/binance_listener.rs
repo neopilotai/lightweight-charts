@@ -253,6 +253,13 @@ pub async fn start_binance_listener(state: AppState) {
                                     // Update indicators for the first candle
                                     update_indicators_last(&mut candles);
                                 }
+
+                                let serialized: Vec<Candle> = candles.iter().cloned().collect();
+                                if let Err(e) = state.db.save_candle_history(&symbol_lower, &serialized) {
+                                    tracing::error!(symbol = %symbol_lower, error = %e, "Failed to persist candle history");
+                                }
+
+                                state.health_state.update_cache_size(&symbol_lower, candles.len());
                             }
 
                             // Send to all connected clients via their individual channels
