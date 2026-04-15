@@ -110,6 +110,7 @@ mod tests {
         let channel = LockFreeChannel::new(100);
         let data = Arc::new(MarketData {
             symbol: "BTCUSDT".to_string(),
+            sequence: 1,
             time: 1234567890,
             open: 50000.0,
             high: 51000.0,
