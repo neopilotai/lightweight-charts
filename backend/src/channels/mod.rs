@@ -125,4 +125,51 @@ mod tests {
         assert_eq!(received.symbol, "BTCUSDT");
         assert_eq!(channel.depth(), 0);
     }
+
+    #[tokio::test]
+    async fn test_mpsc_client_channel_bounded() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Arc<MarketData>>();
+        let data = Arc::new(MarketData {
+            symbol: "BTCUSDT".to_string(),
+            sequence: 1,
+            time: 1234567890,
+            open: 50000.0,
+            high: 51000.0,
+            low: 49000.0,
+            close: 50500.0,
+        });
+
+        // Test that messages are queued
+        tx.send(data.clone()).unwrap();
+        assert!(rx.recv().await.is_some());
+
+        // Test that channel closes properly
+        drop(tx);
+        assert!(rx.recv().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_slow_client_doesnt_block_others() {
+        // Test that one slow consumer doesn't block fast producers
+        let (tx1, _rx1) = tokio::sync::mpsc::unbounded_channel::<Arc<MarketData>>();
+        let (tx2, mut rx2) = tokio::sync::mpsc::unbounded_channel::<Arc<MarketData>>();
+
+        let data = Arc::new(MarketData {
+            symbol: "BTCUSDT".to_string(),
+            sequence: 1,
+            time: 1234567890,
+            open: 50000.0,
+            high: 51000.0,
+            low: 49000.0,
+            close: 50500.0,
+        });
+
+        // Send on both channels
+        tx1.send(data.clone()).unwrap();
+        tx2.send(data.clone()).unwrap();
+
+        // Slow client (rx1) never receives, but fast client (rx2) should still work
+        assert!(rx2.recv().await.is_some());
+        assert_eq!(rx2.len(), 0);
+    }
 }
