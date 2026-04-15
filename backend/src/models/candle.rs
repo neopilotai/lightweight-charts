@@ -1,7 +1,7 @@
 // src/models/candle.rs
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Candle {
     pub time: u64,
     pub open: f64,
