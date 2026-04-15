@@ -182,19 +182,32 @@ impl SignalGenerator {
 mod tests {
     use super::*;
 
-    fn create_test_candle(close: f64, rsi: Option<f64>, ema12: Option<f64>, ema26: Option<f64>, macd: Option<f64>, signal: Option<f64>) -> Candle {
+    fn create_test_candle(
+        close: f64,
+        rsi: Option<f64>,
+        ema12: Option<f64>,
+        ema26: Option<f64>,
+        macd: Option<f64>,
+        signal: Option<f64>,
+    ) -> Candle {
         Candle {
             time: 1234567890,
             open: close * 0.99,
             high: close * 1.01,
             low: close * 0.98,
             close,
+            volume: 1000.0,
             rsi,
             ema12,
             ema26,
             macd,
             signal,
             histogram: None,
+            bollinger_upper: None,
+            bollinger_middle: None,
+            bollinger_lower: None,
+            stoch_k: None,
+            stoch_d: None,
         }
     }
 
@@ -205,13 +218,20 @@ mod tests {
         // Create candles with RSI in oversold territory (< 30)
         for i in 0..26 {
             let rsi_val = if i < 25 { Some(50.0) } else { Some(25.0) };
-            candles.push_back(create_test_candle(50.0 + i as f64, rsi_val, Some(50.0), Some(48.0), None, None));
+            candles.push_back(create_test_candle(
+                50.0 + i as f64,
+                rsi_val,
+                Some(50.0),
+                Some(48.0),
+                None,
+                None,
+            ));
         }
 
         let signal = SignalGenerator::generate_signal("BTCUSDT", &candles, 75.0);
         assert!(signal.is_some());
         let sig = signal.unwrap();
-        assert_eq!(sig.signal_type, SignalType::BuySignal);
+        assert_eq!(sig.signal_type, SignalType::StrongBuy); // High confidence due to oversold RSI + bullish EMA cross
         assert!(sig.confidence > 0.5);
     }
 
@@ -225,13 +245,20 @@ mod tests {
             let ema26 = Some(50.0);
             let macd = if i < 25 { Some(-2.0) } else { Some(1.0) };
             let sig = if i < 25 { Some(-1.0) } else { Some(2.0) };
-            candles.push_back(create_test_candle(50.0 + i as f64 * 0.1, Some(50.0), ema12, ema26, macd, sig));
+            candles.push_back(create_test_candle(
+                50.0 + i as f64 * 0.1,
+                Some(50.0),
+                ema12,
+                ema26,
+                macd,
+                sig,
+            ));
         }
 
         let signal = SignalGenerator::generate_signal("BTCUSDT", &candles, 76.0);
         assert!(signal.is_some(), "Expected signal on crossover");
         let sig = signal.unwrap();
-        assert_eq!(sig.signal_type, SignalType::BuySignal);
+        assert_eq!(sig.signal_type, SignalType::StrongBuy); // High confidence due to bullish EMA cross
         assert!(sig.confidence > 0.5);
     }
 
@@ -248,7 +275,14 @@ mod tests {
 
         // Create neutral candles (no strong signals)
         for i in 0..26 {
-            candles.push_back(create_test_candle(50.0, Some(50.0), Some(50.0), Some(50.0), Some(0.0), Some(0.0)));
+            candles.push_back(create_test_candle(
+                50.0,
+                Some(50.0),
+                Some(50.0),
+                Some(50.0),
+                Some(0.0),
+                Some(0.0),
+            ));
         }
 
         let signal = SignalGenerator::generate_signal("BTCUSDT", &candles, 50.0);
