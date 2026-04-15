@@ -1,23 +1,49 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import '../styles/MarketDepth.css'
 
 export default function MarketDepth({ symbol }) {
-  const [depth, setDepth] = useState({
-    bids: [
-      { price: 43450, amount: 1.5, percentage: 75 },
-      { price: 43440, amount: 2.3, percentage: 60 },
-      { price: 43430, amount: 3.1, percentage: 45 },
-      { price: 43420, amount: 4.2, percentage: 30 },
-      { price: 43410, amount: 5.1, percentage: 15 },
-    ],
-    asks: [
-      { price: 43460, amount: 5.2, percentage: 20 },
-      { price: 43470, amount: 4.1, percentage: 35 },
-      { price: 43480, amount: 3.3, percentage: 50 },
-      { price: 43490, amount: 2.5, percentage: 65 },
-      { price: 43500, amount: 1.8, percentage: 80 },
-    ],
-  })
+  const [depth, setDepth] = useState({ bids: [], asks: [] })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchOrderBook = async () => {
+      try {
+        const response = await fetch(`/api/orderbook?symbol=${symbol}`)
+        const data = await response.json()
+        
+        const maxQty = Math.max(
+          ...data.bids.map(b => b.quantity),
+          ...data.asks.map(a => a.quantity),
+          1
+        )
+        
+        setDepth({
+          bids: data.bids.map(b => ({
+            price: b.price,
+            amount: b.quantity,
+            percentage: (b.quantity / maxQty) * 100
+          })),
+          asks: data.asks.map(a => ({
+            price: a.price,
+            amount: a.quantity,
+            percentage: (a.quantity / maxQty) * 100
+          }))
+        })
+        setLoading(false)
+      } catch (error) {
+        console.error('Error fetching orderbook:', error)
+        setLoading(false)
+      }
+    }
+
+    fetchOrderBook()
+    const interval = setInterval(fetchOrderBook, 2000)
+    return () => clearInterval(interval)
+  }, [symbol])
+
+  if (loading) {
+    return <div className="market-depth"><h3>Market Depth - {symbol.toUpperCase()}</h3><p>Loading...</p></div>
+  }
 
   return (
     <div className="market-depth">
@@ -29,8 +55,8 @@ export default function MarketDepth({ symbol }) {
           {depth.bids.map((bid, idx) => (
             <div key={idx} className="depth-row">
               <div className="depth-bar" style={{ width: `${bid.percentage}%` }}></div>
-              <span className="depth-price">${bid.price}</span>
-              <span className="depth-amount">{bid.amount}</span>
+              <span className="depth-price">${bid.price.toFixed(2)}</span>
+              <span className="depth-amount">{bid.amount.toFixed(4)}</span>
             </div>
           ))}
         </div>
@@ -39,8 +65,8 @@ export default function MarketDepth({ symbol }) {
           <div className="depth-header">Asks (Sell)</div>
           {depth.asks.map((ask, idx) => (
             <div key={idx} className="depth-row">
-              <span className="depth-amount">{ask.amount}</span>
-              <span className="depth-price">${ask.price}</span>
+              <span className="depth-amount">{ask.amount.toFixed(4)}</span>
+              <span className="depth-price">${ask.price.toFixed(2)}</span>
               <div className="depth-bar" style={{ width: `${ask.percentage}%` }}></div>
             </div>
           ))}

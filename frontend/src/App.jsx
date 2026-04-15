@@ -4,6 +4,7 @@ import StrategyPanel from './components/StrategyPanel'
 import SignalsPanel from './components/SignalsPanel'
 import PortfolioStatsPanel from './components/PortfolioStatsPanel'
 import SymbolSelector from './components/SymbolSelector'
+import MarketDepth from './components/MarketDepth'
 import './styles/App.css'
 
 export default function App() {
@@ -50,11 +51,16 @@ export default function App() {
       <div className="app-layout">
         {/* Main Chart Area */}
         <div className="chart-container">
-          <ChartPanel symbol={selectedSymbol} />
+          <ChartPanel symbol={selectedSymbol} signals={signals} />
         </div>
 
         {/* Right Sidebar */}
         <div className="sidebar">
+          {/* Market Depth Panel */}
+          <div className="panel market-depth-panel">
+            <MarketDepth symbol={selectedSymbol} />
+          </div>
+
           {/* Signals Panel */}
           <div className="panel signals-panel">
             <SignalsPanel signals={signals} />
