@@ -11,21 +11,24 @@ use std::sync::Arc;
 #[derive(Deserialize)]
 pub struct MarketQuery {
     pub symbol: Option<String>,
+    pub interval: Option<String>,
 }
 
 pub async fn get_candles(Query(params): Query<MarketQuery>, state: AppState) -> Json<Vec<Candle>> {
     let symbol = params.symbol.unwrap_or_else(|| "btcusdt".to_string()).to_lowercase();
+    let interval = params.interval.unwrap_or_else(|| "1m".to_string());
     
     // Check rate limit per endpoint
     let client_ip = "default"; // Would be extracted from request in production
     
-    // Check cache first
-    if let Some(candles) = state.candles_cache.get(&symbol) {
+    // Check cache first (include interval in cache key)
+    let cache_key = format!("{}:{}", symbol, interval);
+    if let Some(candles) = state.candles_cache.get(&cache_key) {
         return Json(candles.iter().cloned().collect());
     }
     
     // Fetch from API and cache
-    match get_historical_candles(&symbol).await {
+    match get_historical_candles(&symbol, &interval).await {
         Ok(candles_vec) => {
             let mut deque: VecDeque<Candle> = candles_vec.into_iter().collect();
             // Limit to MAX_CANDLES
@@ -33,7 +36,7 @@ pub async fn get_candles(Query(params): Query<MarketQuery>, state: AppState) -> 
                 deque.pop_front();
             }
             let result: Vec<Candle> = deque.iter().cloned().collect();
-            state.candles_cache.insert(symbol, deque);
+            state.candles_cache.insert(cache_key, deque);
             Json(result)
         }
         Err(_) => Json(vec![]),
@@ -54,19 +57,22 @@ pub async fn get_candles_rate_limited(
     }
     
     let symbol = params.symbol.unwrap_or_else(|| "btcusdt".to_string()).to_lowercase();
+    let interval = params.interval.unwrap_or_else(|| "1m".to_string());
     
-    if let Some(candles) = state.candles_cache.get(&symbol) {
+    // Check cache first (include interval in cache key)
+    let cache_key = format!("{}:{}", symbol, interval);
+    if let Some(candles) = state.candles_cache.get(&cache_key) {
         return Ok(Json(candles.iter().cloned().collect()));
     }
     
-    match get_historical_candles(&symbol).await {
+    match get_historical_candles(&symbol, &interval).await {
         Ok(candles_vec) => {
             let mut deque: VecDeque<Candle> = candles_vec.into_iter().collect();
             while deque.len() > MAX_CANDLES {
                 deque.pop_front();
             }
             let result: Vec<Candle> = deque.iter().cloned().collect();
-            state.candles_cache.insert(symbol, deque);
+            state.candles_cache.insert(cache_key, deque);
             Ok(Json(result))
         }
         Err(_) => Ok(Json(vec![])),
