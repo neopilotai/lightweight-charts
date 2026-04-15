@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trading-backend-config
+data:
+  RUST_LOG: "info"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trading-backend
+spec:
+  selector:
+    app: trading-backend
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: trading-backend
+  template:
+    metadata:
+      labels:
+        app: trading-backend
+    spec:
+      containers:
+        - name: backend
+          image: trading-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: RUST_LOG
+              valueFrom:
+                configMapKeyRef:
+                  name: trading-backend-config
+                  key: RUST_LOG
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trading-backend-lb
+spec:
+  selector:
+    app: trading-backend
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: LoadBalancer
