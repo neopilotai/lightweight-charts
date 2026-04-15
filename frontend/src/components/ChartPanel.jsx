@@ -37,7 +37,7 @@ function saveState(state) {
   }
 }
 
-export default function ChartPanel({ symbol }) {
+export default function ChartPanel({ symbol, signals = [] }) {
   const containerRef = useRef(null)
   const chartRef = useRef(null)
   const candleSeriesRef = useRef(null)
@@ -47,6 +47,7 @@ export default function ChartPanel({ symbol }) {
   const rsiSeriesRef = useRef(null)
   const macdSeriesRef = useRef(null)
   const signalLineRef = useRef(null)
+  const markerSeriesRef = useRef(null)
   
   const [timeframe, setTimeframe] = useState(() => {
     const saved = loadState()
@@ -165,6 +166,9 @@ export default function ChartPanel({ symbol }) {
       priceScaleId: 'macd', title: 'MACD Signal',
     })
 
+    // Strategy signal markers
+    const markerSeries = chart.addMarkersSeries()
+
     // Configure price scales
     chart.priceScale('left').applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } })
     chart.priceScale('rsi').applyOptions({ scaleMargins: { top: 0.7, bottom: 0 }, autoScale: false, fixedMin: 0, fixedMax: 100 })
@@ -178,6 +182,7 @@ export default function ChartPanel({ symbol }) {
     rsiSeriesRef.current = rsiSeries
     macdSeriesRef.current = macdSeries
     signalLineRef.current = signalLine
+    markerSeriesRef.current = markerSeries
 
     loadChartData(symbol, timeframe, candleSeries, volumeSeries, emaSeries, bbSeries, rsiSeries, macdSeries, signalLine)
 
@@ -220,6 +225,20 @@ export default function ChartPanel({ symbol }) {
     }
     return () => ws.close()
   }, [symbol])
+
+  // Update signal markers when signals change
+  useEffect(() => {
+    if (!markerSeriesRef.current || !signals.length) return
+    
+    const markers = signals.slice(-20).map(signal => ({
+      time: signal.time || Math.floor(Date.now() / 1000),
+      position: signal.action === 'buy' ? 'aboveBar' : 'belowBar',
+      color: signal.action === 'buy' ? '#26a69a' : '#ef5350',
+      shape: signal.action === 'buy' ? 'arrowUp' : 'arrowDown',
+      text: signal.action?.toUpperCase() || '',
+    }))
+    markerSeriesRef.current.setMarkers(markers)
+  }, [signals])
 
   const toggleIndicator = (indicator) => {
     setIndicators(prev => ({ ...prev, [indicator]: !prev[indicator] }))
