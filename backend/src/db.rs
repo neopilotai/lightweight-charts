@@ -19,17 +19,18 @@ impl DbStore {
         format!("candles:{}", symbol)
     }
 
-    pub fn save_candle_history(&self, symbol: &str, candles: &[Candle]) -> Result<(), Error> {
+    pub fn save_candle_history(&self, symbol: &str, candles: &[Candle]) -> Result<(), Box<dyn std::error::Error>> {
         let key = Self::key(symbol);
-        let data = serde_json::to_vec(candles).map_err(|e| Error::new(e.to_string()))?;
-        self.db.put(key, data)
+        let data = serde_json::to_vec(candles)?;
+        self.db.put(key, data)?;
+        Ok(())
     }
 
-    pub fn load_candle_history(&self, symbol: &str) -> Result<Vec<Candle>, Error> {
+    pub fn load_candle_history(&self, symbol: &str) -> Result<Vec<Candle>, Box<dyn std::error::Error>> {
         let key = Self::key(symbol);
         match self.db.get(key)? {
             Some(value) => {
-                let candles: Vec<Candle> = serde_json::from_slice(&value).map_err(|e| Error::new(e.to_string()))?;
+                let candles: Vec<Candle> = serde_json::from_slice(&value)?;
                 Ok(candles)
             }
             None => Ok(vec![]),
@@ -50,5 +51,9 @@ impl DbStore {
         }
 
         Ok(symbols)
+    }
+
+    pub fn flush(&self) -> Result<(), Error> {
+        self.db.flush()
     }
 }
