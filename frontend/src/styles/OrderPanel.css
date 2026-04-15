@@ -1,0 +1,236 @@
+.order-panel,
+.positions-panel {
+  padding: var(--spacing-lg);
+}
+
+.order-panel h3,
+.positions-panel h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Order Panel */
+.order-type-selector {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+  background: var(--tertiary-dark);
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-md);
+}
+
+.type-btn {
+  flex: 1;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  transition: all var(--transition-fast) ease;
+}
+
+.type-btn:hover {
+  color: var(--text-primary);
+}
+
+.type-btn.active {
+  background: var(--color-accent);
+  color: white;
+}
+
+.side-selector {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.side-btn {
+  padding: 10px;
+  background: var(--tertiary-dark);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all var(--transition-fast) ease;
+}
+
+.side-btn.active.buy {
+  background: var(--color-up);
+  color: white;
+  border-color: var(--color-up);
+}
+
+.side-btn.active.sell {
+  background: var(--color-down);
+  color: white;
+  border-color: var(--color-down);
+}
+
+.order-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.order-panel .form-group input {
+  width: 100%;
+}
+
+.submit-btn {
+  padding: 12px;
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  transition: all var(--transition-fast) ease;
+}
+
+.submit-btn.buy {
+  background: var(--color-up);
+}
+
+.submit-btn.buy:hover {
+  background: #229e88;
+}
+
+.submit-btn.sell {
+  background: var(--color-down);
+}
+
+.submit-btn.sell:hover {
+  background: #d63031;
+}
+
+/* Positions Panel */
+.positions-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.position-item {
+  padding: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-dark);
+  border-left: 3px solid var(--border-dark);
+  border-radius: var(--border-radius-md);
+  transition: all var(--transition-fast) ease;
+}
+
+.position-item.long {
+  border-left-color: var(--color-up);
+}
+
+.position-item.short {
+  border-left-color: var(--color-down);
+}
+
+.position-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.position-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.position-header .symbol {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.position-header .pnl {
+  font-weight: 600;
+}
+
+.position-header .pnl.positive {
+  color: var(--color-up);
+}
+
+.position-header .pnl.negative {
+  color: var(--color-down);
+}
+
+.position-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-row .label {
+  color: var(--text-secondary);
+}
+
+.detail-row .value {
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-weight: 500;
+}
+
+.detail-row .value.positive {
+  color: var(--color-up);
+}
+
+.detail-row .value.negative {
+  color: var(--color-down);
+}
+
+.close-btn {
+  width: 100%;
+  padding: 8px;
+  background: var(--tertiary-dark);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  transition: all var(--transition-fast) ease;
+}
+
+.close-btn:hover {
+  background: var(--color-down);
+  color: white;
+  border-color: var(--color-down);
+}
+
+.no-positions,
+.loading {
+  text-align: center;
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 1024px) {
+  .positions-list {
+    max-height: 250px;
+  }
+
+  .side-selector {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
