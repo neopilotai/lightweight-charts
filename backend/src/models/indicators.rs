@@ -268,3 +268,47 @@ fn update_macd_last(closes: &[f64]) -> Option<MacdValue> {
         histogram: None,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_closes() -> Vec<f64> {
+        vec![
+            44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08,
+            45.89, 46.03, 45.61, 46.28, 46.28, 46.00, 46.03, 46.41, 46.22, 45.64,
+            46.21, 46.25, 45.71, 46.45, 45.78, 45.35, 44.03, 44.18, 44.22, 44.57,
+            43.42, 42.66, 43.13, 43.72, 44.03, 43.61,
+        ]
+    }
+
+    #[test]
+    fn test_rsi_calculation_matches_reference() {
+        let closes = sample_closes();
+        let rsi_values = calculate_rsi(&closes, 14);
+
+        assert_eq!(rsi_values.len(), closes.len());
+        assert!(rsi_values[13].is_none());
+        let last_rsi = rsi_values.last().unwrap().unwrap();
+        let incremental_rsi = update_rsi_last(&closes, 14).unwrap();
+
+        assert!((last_rsi - 71.27).abs() < 0.5, "expected RSI around 71.27, got {}", last_rsi);
+        assert!((incremental_rsi - last_rsi).abs() < 1.0e-6, "incremental RSI must match full RSI");
+    }
+
+    #[test]
+    fn test_ema_incremental_equals_full() {
+        let closes = sample_closes();
+        let ema12_values = calculate_ema(&closes, 12);
+        let ema26_values = calculate_ema(&closes, 26);
+
+        let last_ema12 = ema12_values.last().unwrap().unwrap();
+        let last_ema26 = ema26_values.last().unwrap().unwrap();
+
+        let incremental_ema12 = update_ema_last(&closes, 12).unwrap();
+        let incremental_ema26 = update_ema_last(&closes, 26).unwrap();
+
+        assert!((incremental_ema12 - last_ema12).abs() < 1.0e-6);
+        assert!((incremental_ema26 - last_ema26).abs() < 1.0e-6);
+    }
+}
