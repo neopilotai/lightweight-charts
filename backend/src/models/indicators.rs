@@ -44,38 +44,64 @@ pub fn calculate_indicators(candles: &mut Vec<Candle>) {
 }
 
 pub fn update_indicators_last(candles: &mut VecDeque<Candle>) {
-    if candles.len() < 2 {
+    if candles.is_empty() {
         return;
     }
 
-    let closes: Vec<f64> = candles.iter().map(|c| c.close).collect();
-    let _last_idx = closes.len() - 1;
+    // Clone the candles to avoid borrowing issues during calculations
+    let candles_clone: VecDeque<Candle> = candles.clone();
 
-    // Update RSI for last candle
-    if let Some(rsi) = update_rsi_last(&closes, 14) {
-        if let Some(candle) = candles.back_mut() {
-            candle.rsi = Some(rsi);
-        }
-    }
+    // Get the last candle for updating
+    if let Some(last_candle) = candles.back_mut() {
+        // Get a clone of the closes for calculations to avoid borrowing issues
+        let closes: Vec<f64> = candles_clone.iter().map(|c| c.close).collect();
 
-    // Update EMAs for last candle
-    if let Some(ema12) = update_ema_last(&closes, 12) {
-        if let Some(candle) = candles.back_mut() {
-            candle.ema12 = Some(ema12);
+        // Update RSI for last candle (needs access to recent closes)
+        if closes.len() >= 15 {
+            // Need at least period+1 for RSI
+            if let Some(rsi) = update_rsi_last(&closes, 14) {
+                last_candle.rsi = Some(rsi);
+            }
         }
-    }
-    if let Some(ema26) = update_ema_last(&closes, 26) {
-        if let Some(candle) = candles.back_mut() {
-            candle.ema26 = Some(ema26);
-        }
-    }
 
-    // Update MACD for last candle
-    if let Some(macd) = update_macd_last(&closes) {
-        if let Some(candle) = candles.back_mut() {
-            candle.macd = macd.macd;
-            candle.signal = macd.signal;
-            candle.histogram = macd.histogram;
+        // Update EMAs for last candle (truly incremental)
+        if let Some(prev_ema12) = last_candle.ema12 {
+            // EMA formula: EMA_today = (Price_today * k) + (EMA_yesterday * (1 - k))
+            // where k = 2 / (period + 1)
+            let k12 = 2.0 / (12.0 + 1.0);
+            let ema12 = (last_candle.close * k12) + (prev_ema12 * (1.0 - k12));
+            last_candle.ema12 = Some(ema12);
+        } else if closes.len() >= 12 {
+            // Initial EMA is simple average of first 12 periods
+            let sum: f64 = closes.iter().rev().take(12).sum();
+            last_candle.ema12 = Some(sum / 12.0);
+        }
+
+        if let Some(prev_ema26) = last_candle.ema26 {
+            let k26 = 2.0 / (26.0 + 1.0);
+            let ema26 = (last_candle.close * k26) + (prev_ema26 * (1.0 - k26));
+            last_candle.ema26 = Some(ema26);
+        } else if closes.len() >= 26 {
+            // Initial EMA is simple average of first 26 periods
+            let sum: f64 = closes.iter().rev().take(26).sum();
+            last_candle.ema26 = Some(sum / 26.0);
+        }
+
+        // Update MACD components
+        if let (Some(ema12), Some(ema26)) = (last_candle.ema12, last_candle.ema26) {
+            let macd = ema12 - ema26;
+            last_candle.macd = Some(macd);
+
+            // For signal line and histogram, we'd need to maintain EMA of MACD
+            // Simplified approach: use previous values if available
+            if let (Some(prev_signal), Some(_prev_histogram)) =
+                (last_candle.signal, last_candle.histogram)
+            {
+                // Simplified signal update (would be better with proper EMA of MACD)
+                let signal = macd * 0.2 + prev_signal * 0.8; // Approximate 9-period EMA
+                last_candle.signal = Some(signal);
+                last_candle.histogram = Some(macd - signal);
+            }
         }
     }
 }

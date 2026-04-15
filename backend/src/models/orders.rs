@@ -1,6 +1,6 @@
 // src/models/orders.rs
-use serde::{Serialize, Deserialize};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum OrderType {
@@ -96,12 +96,7 @@ pub struct Trade {
 }
 
 impl Trade {
-    pub fn new(
-        symbol: String,
-        side: OrderSide,
-        quantity: f64,
-        entry_price: f64,
-    ) -> Self {
+    pub fn new(symbol: String, side: OrderSide, quantity: f64, entry_price: f64) -> Self {
         Trade {
             id: format!("TRADE_{}_{}", symbol, Utc::now().timestamp()),
             symbol,
@@ -130,12 +125,7 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn new(
-        symbol: String,
-        quantity: f64,
-        entry_price: f64,
-        side: OrderSide,
-    ) -> Self {
+    pub fn new(symbol: String, quantity: f64, entry_price: f64, side: OrderSide) -> Self {
         Position {
             symbol,
             quantity,
@@ -187,11 +177,7 @@ pub struct SignalIndicators {
 }
 
 impl Signal {
-    pub fn new_buy(
-        symbol: String,
-        confidence: f64,
-        indicators: SignalIndicators,
-    ) -> Self {
+    pub fn new_buy(symbol: String, confidence: f64, indicators: SignalIndicators) -> Self {
         Signal {
             symbol,
             signal_type: if confidence > 0.7 {
@@ -205,11 +191,7 @@ impl Signal {
         }
     }
 
-    pub fn new_sell(
-        symbol: String,
-        confidence: f64,
-        indicators: SignalIndicators,
-    ) -> Self {
+    pub fn new_sell(symbol: String, confidence: f64, indicators: SignalIndicators) -> Self {
         Signal {
             symbol,
             signal_type: if confidence > 0.7 {
