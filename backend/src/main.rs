@@ -25,7 +25,7 @@ use axum::http::HeaderValue;
 use tokio::{net::TcpListener, sync::Notify};
 use tower_http::cors::{CorsLayer, Any, AllowOrigin};
 
-use routes::market::get_candles_rate_limited;
+use routes::market::{get_candles_rate_limited, get_order_book};
 use routes::trading::{TradingState, create_router};
 use routes::health::{create_health_router, HealthState};
 use routes::auth::create_auth_router;
@@ -126,6 +126,7 @@ async fn main() {
             let state = state.clone();
             move |query, connect_info| get_candles_rate_limited(query, state, connect_info)
         }))
+        .route("/api/orderbook", get(get_order_book))
         .route("/ws", get({
             let state = state.clone();
             move |ws: WebSocketUpgrade, query| async move { ws_handler(ws, query, state).await }

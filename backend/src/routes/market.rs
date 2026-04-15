@@ -125,3 +125,61 @@ pub async fn get_candles_custom_indicators(
         Err(_) => Ok(Json(vec![])),
     }
 }
+
+#[derive(serde::Serialize)]
+pub struct OrderBookEntry {
+    pub price: f64,
+    pub quantity: f64,
+}
+
+#[derive(serde::Serialize)]
+pub struct OrderBook {
+    pub symbol: String,
+    pub bids: Vec<OrderBookEntry>,
+    pub asks: Vec<OrderBookEntry>,
+    pub timestamp: u64,
+}
+
+pub async fn get_order_book(
+    Query(params): Query<MarketQuery>,
+) -> Result<Json<OrderBook>, axum::http::StatusCode> {
+    let symbol = params.symbol.unwrap_or_else(|| "btcusdt".to_string()).to_uppercase();
+    
+    let url = format!("https://api.binance.com/api/v3/depth?symbol={}&limit=20", symbol);
+    
+    match reqwest::get(&url).await {
+        Ok(response) => {
+            #[derive(Deserialize)]
+            struct BinanceBook {
+                bids: Vec<Vec<String>>,
+                asks: Vec<Vec<String>>,
+            }
+            
+            match response.json::<BinanceBook>().await {
+                Ok(book) => {
+                    let bids: Vec<OrderBookEntry> = book.bids.iter().take(10).map(|b| OrderBookEntry {
+                        price: b[0].parse().unwrap_or(0.0),
+                        quantity: b[1].parse().unwrap_or(0.0),
+                    }).collect();
+                    
+                    let asks: Vec<OrderBookEntry> = book.asks.iter().take(10).map(|a| OrderBookEntry {
+                        price: a[0].parse().unwrap_or(0.0),
+                        quantity: a[1].parse().unwrap_or(0.0),
+                    }).collect();
+                    
+                    Ok(Json(OrderBook {
+                        symbol: symbol.to_lowercase(),
+                        bids,
+                        asks,
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                    }))
+                }
+                Err(_) => Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
+            }
+        }
+        Err(_) => Err(axum::http::StatusCode::SERVICE_UNAVAILABLE),
+    }
+}
