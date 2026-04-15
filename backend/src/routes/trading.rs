@@ -380,7 +380,7 @@ pub async fn get_signals(
     Ok(Json(signals))
 }
 
-pub fn create_router(trading_state: TradingState) -> Router<TradingState> {
+pub fn create_router(trading_state: TradingState) -> Router {
     Router::new()
         .route("/strategies", post(create_strategy).get(list_strategies))
         .route("/strategies/get", get(get_strategy))
