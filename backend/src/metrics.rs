@@ -86,3 +86,7 @@ pub fn gather_metrics() -> Vec<u8> {
     encoder.encode(&metric_families, &mut buffer).unwrap();
     buffer
 }
+
+pub fn flush_metrics() -> Vec<u8> {
+    gather_metrics()
+}
