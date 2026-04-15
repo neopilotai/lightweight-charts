@@ -5,6 +5,21 @@ import '../styles/ChartPanel.css'
 const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d']
 const STORAGE_KEY = 'trading-dashboard-state'
 
+const DEFAULT_INDICATORS = {
+  rsi: true,
+  macd: true,
+  ema: false,
+  bollinger: false,
+}
+
+const DEFAULT_PARAMS = {
+  rsiPeriod: 14,
+  macdFast: 12,
+  macdSlow: 26,
+  bbPeriod: 20,
+  bbStd: 2,
+}
+
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -27,6 +42,8 @@ export default function ChartPanel({ symbol }) {
   const chartRef = useRef(null)
   const candleSeriesRef = useRef(null)
   const volumeSeriesRef = useRef(null)
+  const emaSeriesRef = useRef(null)
+  const bbSeriesRef = useRef(null)
   const rsiSeriesRef = useRef(null)
   const macdSeriesRef = useRef(null)
   const signalLineRef = useRef(null)
@@ -35,57 +52,70 @@ export default function ChartPanel({ symbol }) {
     const saved = loadState()
     return saved?.timeframe || '1h'
   })
-  const [indicatorVisibility, setIndicatorVisibility] = useState(() => {
+  const [indicators, setIndicators] = useState(() => {
     const saved = loadState()
-    return saved?.indicators || { rsi: true, macd: true }
+    return saved?.indicators || DEFAULT_INDICATORS
   })
+  const [params, setParams] = useState(() => {
+    const saved = loadState()
+    return saved?.params || DEFAULT_PARAMS
+  })
+  const [showSettings, setShowSettings] = useState(false)
 
-  // Persist state on change
   useEffect(() => {
-    saveState({ symbol, timeframe, indicators: indicatorVisibility })
-  }, [symbol, timeframe, indicatorVisibility])
+    saveState({ symbol, timeframe, indicators, params })
+  }, [symbol, timeframe, indicators, params])
 
-  const loadChartData = useCallback(async (sym, tf, candleSeries, volumeSeries, rsiSeries, macdSeries, signalLine) => {
+  const loadChartData = useCallback(async (sym, tf, candleSeries, volumeSeries, emaSeries, bbSeries, rsiSeries, macdSeries, signalLine) => {
     try {
-      const response = await fetch(`/api/candles?symbol=${sym}&interval=${tf}`)
+      const queryParams = new URLSearchParams({ symbol: sym, interval: tf })
+      if (params.rsiPeriod !== 14) queryParams.set('rsi_period', params.rsiPeriod.toString())
+      if (params.macdFast !== 12) queryParams.set('macd_fast', params.macdFast.toString())
+      if (params.macdSlow !== 26) queryParams.set('macd_slow', params.macdSlow.toString())
+      if (params.bbPeriod !== 20) queryParams.set('bb_period', params.bbPeriod.toString())
+      if (params.bbStd !== 2) queryParams.set('bb_std', params.bbStd.toString())
+      
+      const response = await fetch(`/api/candles?${queryParams}`)
       const data = await response.json()
 
-      // Set candlestick data
       const candleData = data.map(d => ({
         time: d.time,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
+        open: d.open, high: d.high, low: d.low, close: d.close,
       }))
       candleSeries.setData(candleData)
 
-      // Set volume data
       const volumeData = data.map(d => ({
-        time: d.time,
-        value: d.volume || 0,
+        time: d.time, value: d.volume || 0,
         color: d.close >= d.open ? '#26a69a40' : '#ef535040',
       }))
       volumeSeries.setData(volumeData)
 
-      // Set RSI data
-      if (indicatorVisibility.rsi) {
-        const rsiData = data
-          .filter(d => d.rsi !== null)
-          .map(d => ({ time: d.time, value: d.rsi }))
+      if (indicators.ema) {
+        const emaData = data.filter(d => d.ema12 !== null).map(d => ({ time: d.time, value: d.ema12 }))
+        const ema26Data = data.filter(d => d.ema26 !== null).map(d => ({ time: d.time, value: d.ema26, lineWidth: 1, color: '#FF6B6B' }))
+        emaSeries.setData(emaData)
+        if (emaSeriesRef.current) emaSeriesRef.current.setData(ema26Data)
+      }
+
+      if (indicators.bollinger) {
+        const bbData = data.filter(d => d.bollinger_middle !== null).map(d => ({
+          time: d.time,
+          value: d.bollinger_middle,
+          lineWidth: 1,
+          lineColor: '#4CAF50',
+        }))
+        bbSeries.setData(bbData)
+      }
+
+      if (indicators.rsi) {
+        const rsiData = data.filter(d => d.rsi !== null).map(d => ({ time: d.time, value: d.rsi }))
         rsiSeries.setData(rsiData)
       }
 
-      // Set MACD data
-      if (indicatorVisibility.macd) {
-        const macdData = data
-          .filter(d => d.histogram !== null)
-          .map(d => ({ time: d.time, value: d.histogram }))
+      if (indicators.macd) {
+        const macdData = data.filter(d => d.histogram !== null).map(d => ({ time: d.time, value: d.histogram }))
         macdSeries.setData(macdData)
-
-        const signalData = data
-          .filter(d => d.macd_line !== null)
-          .map(d => ({ time: d.time, value: d.macd_line }))
+        const signalData = data.filter(d => d.signal !== null).map(d => ({ time: d.time, value: d.signal }))
         signalLine.setData(signalData)
       }
 
@@ -93,7 +123,7 @@ export default function ChartPanel({ symbol }) {
     } catch (error) {
       console.error('Error loading chart data:', error)
     }
-  }, [indicatorVisibility])
+  }, [indicators, params])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -116,6 +146,9 @@ export default function ChartPanel({ symbol }) {
       priceScaleId: 'volume',
     })
     chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } })
+
+    const emaSeries = chart.addLineSeries({ color: '#00BCD4', lineWidth: 1, priceScaleId: 'left', title: 'EMA 12' })
+    const bbSeries = chart.addLineSeries({ color: '#4CAF50', lineWidth: 1, lineStyle: 2, priceScaleId: 'left', title: 'BB Middle' })
 
     const rsiSeries = chart.addLineSeries({
       color: '#9c27b0', lineWidth: 2,
@@ -140,11 +173,13 @@ export default function ChartPanel({ symbol }) {
     chartRef.current = chart
     candleSeriesRef.current = candleSeries
     volumeSeriesRef.current = volumeSeries
+    emaSeriesRef.current = emaSeries
+    bbSeriesRef.current = bbSeries
     rsiSeriesRef.current = rsiSeries
     macdSeriesRef.current = macdSeries
     signalLineRef.current = signalLine
 
-    loadChartData(symbol, timeframe, candleSeries, volumeSeries, rsiSeries, macdSeries, signalLine)
+    loadChartData(symbol, timeframe, candleSeries, volumeSeries, emaSeries, bbSeries, rsiSeries, macdSeries, signalLine)
 
     const handleResize = () => {
       if (containerRef.current) {
@@ -187,7 +222,11 @@ export default function ChartPanel({ symbol }) {
   }, [symbol])
 
   const toggleIndicator = (indicator) => {
-    setIndicatorVisibility(prev => ({ ...prev, [indicator]: !prev[indicator] }))
+    setIndicators(prev => ({ ...prev, [indicator]: !prev[indicator] }))
+  }
+
+  const updateParam = (key, value) => {
+    setParams(prev => ({ ...prev, [key]: value }))
   }
 
   return (
@@ -204,13 +243,22 @@ export default function ChartPanel({ symbol }) {
           </div>
           <div className="indicator-toggles">
             <label className="toggle-label">
-              <input type="checkbox" checked={indicatorVisibility.rsi} onChange={() => toggleIndicator('rsi')} />
+              <input type="checkbox" checked={indicators.rsi} onChange={() => toggleIndicator('rsi')} />
               RSI
             </label>
             <label className="toggle-label">
-              <input type="checkbox" checked={indicatorVisibility.macd} onChange={() => toggleIndicator('macd')} />
+              <input type="checkbox" checked={indicators.macd} onChange={() => toggleIndicator('macd')} />
               MACD
             </label>
+            <label className="toggle-label">
+              <input type="checkbox" checked={indicators.ema} onChange={() => toggleIndicator('ema')} />
+              EMA
+            </label>
+            <label className="toggle-label">
+              <input type="checkbox" checked={indicators.bollinger} onChange={() => toggleIndicator('bollinger')} />
+              BB
+            </label>
+            <button className="settings-btn" onClick={() => setShowSettings(!showSettings)}>⚙️</button>
           </div>
         </div>
       </div>
