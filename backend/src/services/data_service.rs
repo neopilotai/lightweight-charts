@@ -22,6 +22,11 @@ pub async fn get_historical_candles(symbol: &str, interval: &str) -> Result<Vec<
             macd: None,
             signal: None,
             histogram: None,
+            bollinger_upper: None,
+            bollinger_middle: None,
+            bollinger_lower: None,
+            stoch_k: None,
+            stoch_d: None,
         }
     }).collect::<Vec<Candle>>();
 
