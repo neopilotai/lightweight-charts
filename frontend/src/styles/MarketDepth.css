@@ -1,0 +1,106 @@
+.market-depth {
+  padding: var(--spacing-lg);
+}
+
+.market-depth h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.depth-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-lg);
+}
+
+.depth-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.depth-header {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.bids .depth-header {
+  color: var(--color-up);
+}
+
+.asks .depth-header {
+  color: var(--color-down);
+}
+
+.depth-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
+  font-size: var(--font-size-xs);
+  position: relative;
+}
+
+.depth-bar {
+  position: absolute;
+  height: 100%;
+  opacity: 0.1;
+  border-radius: 2px;
+}
+
+.bids .depth-bar {
+  background: var(--color-up);
+  right: 0;
+}
+
+.asks .depth-bar {
+  background: var(--color-down);
+  left: 0;
+}
+
+.depth-price {
+  flex: 0 0 auto;
+  width: 70px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+  position: relative;
+  z-index: 1;
+}
+
+.depth-amount {
+  flex: 1;
+  color: var(--text-secondary);
+  text-align: right;
+  position: relative;
+  z-index: 1;
+}
+
+.bids .depth-price {
+  color: var(--color-up);
+}
+
+.asks .depth-price {
+  color: var(--color-down);
+}
+
+@media (max-width: 1024px) {
+  .depth-container {
+    grid-template-columns: 1fr;
+  }
+
+  .depth-row {
+    font-size: var(--font-size-xs);
+  }
+
+  .depth-price {
+    width: 60px;
+  }
+}

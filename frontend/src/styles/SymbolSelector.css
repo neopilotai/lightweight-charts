@@ -1,0 +1,102 @@
+.symbol-selector {
+  position: relative;
+}
+
+.symbol-button {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--tertiary-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  transition: all var(--transition-fast) ease;
+  min-width: 140px;
+}
+
+.symbol-button:hover {
+  background: var(--border-dark);
+  border-color: var(--color-accent);
+}
+
+.symbol-icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: var(--color-accent);
+}
+
+.symbol-name {
+  flex: 1;
+}
+
+.dropdown-arrow {
+  font-size: 0.75rem;
+  transition: transform var(--transition-fast) ease;
+}
+
+.symbol-button:hover .dropdown-arrow {
+  transform: translateY(2px);
+}
+
+.symbol-dropdown {
+  position: absolute;
+  top: calc(100% + var(--spacing-xs));
+  left: 0;
+  right: 0;
+  background: var(--tertiary-dark);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  animation: slideDown 150ms ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.symbol-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  transition: all var(--transition-fast) ease;
+}
+
+.symbol-option:hover {
+  background: var(--secondary-dark);
+  color: var(--color-accent);
+}
+
+.symbol-option.active {
+  background: var(--color-accent);
+  color: white;
+}
+
+.symbol-option .symbol-icon {
+  font-size: 1.25rem;
+}
+
+.symbol-option.active .symbol-icon {
+  color: white;
+}

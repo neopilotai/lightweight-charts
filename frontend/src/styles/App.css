@@ -1,0 +1,140 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-dark);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  background: var(--secondary-dark);
+  border-bottom: 1px solid var(--border-dark);
+  box-shadow: var(--shadow-sm);
+  z-index: 100;
+}
+
+.app-header h1 {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.app-layout {
+  display: flex;
+  flex: 1;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  overflow: hidden;
+}
+
+.chart-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--secondary-dark);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  gap: var(--spacing-md);
+  overflow-y: auto;
+  padding-right: var(--spacing-xs);
+}
+
+.panel {
+  background: var(--secondary-dark);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.signals-panel {
+  flex: 1;
+  min-height: 200px;
+}
+
+.portfolio-panel {
+  flex: 0 0 auto;
+}
+
+.strategy-panel {
+  flex: 1.5;
+  min-height: 250px;
+}
+
+/* Responsive Design */
+@media (max-width: 1400px) {
+  .app-layout {
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+  }
+
+  .sidebar {
+    width: 300px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    height: auto;
+    max-height: 300px;
+    padding-right: 0;
+    overflow-x: auto;
+    padding-bottom: var(--spacing-xs);
+  }
+
+  .signals-panel,
+  .portfolio-panel,
+  .strategy-panel {
+    min-width: 250px;
+    flex: 1;
+  }
+
+  .chart-container {
+    flex: 0 0 60%;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  .app-layout {
+    flex-direction: column;
+    padding: var(--spacing-xs);
+  }
+
+  .sidebar {
+    max-height: 40vh;
+  }
+
+  .chart-container {
+    flex: 0 0 auto;
+    min-height: 300px;
+  }
+}
