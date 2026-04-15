@@ -19,12 +19,15 @@ mod trading;
 mod channels;
 mod metrics;
 mod middleware;
+mod auth;
 
 use routes::market::get_candles;
 use routes::trading::{TradingState, create_strategy_simple, list_strategies as list_strats, get_signals};
 use routes::health::{create_health_router, HealthState};
+use routes::auth::create_auth_router;
 use ws::handler::handle_socket;
 use channels::MarketData;
+use tokio::signal;
 
 const MAX_CANDLES: usize = 500;
 
@@ -34,6 +37,7 @@ pub struct AppState {
     pub client_senders: Arc<tokio::sync::Mutex<Vec<tokio::sync::mpsc::UnboundedSender<Arc<MarketData>>>>>,
     pub sequence_tracker: Arc<parking_lot::Mutex<DashMap<String, u64>>>,
     pub health_state: crate::routes::health::HealthState,
+    pub shutdown_signal: Arc<parking_lot::Mutex<bool>>,
 }
 
 #[tokio::main]
@@ -64,6 +68,7 @@ async fn main() {
         client_senders: Arc::new(tokio::sync::Mutex::new(Vec::new())),
         sequence_tracker: Arc::new(parking_lot::Mutex::new(DashMap::new())),
         health_state: health_state_clone,
+        shutdown_signal: Arc::new(parking_lot::Mutex::new(false)),
     };
 
     // Create trading state
@@ -77,6 +82,7 @@ async fn main() {
 
     let app = Router::new()
         .merge(create_health_router(health_state))
+        .merge(create_auth_router())
         .route("/api/candles", get({
             let state = state.clone();
             move |query| get_candles(query, state)
@@ -102,7 +108,30 @@ async fn main() {
     tracing::info!("Server running at http://localhost:3000");
 
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    
+    // Set up signal handlers for graceful shutdown
+    let shutdown = state.shutdown_signal.clone();
+    tokio::spawn(async move {
+        let sig = signal::ctrl_c().await;
+        if sig.is_ok() {
+            tracing::info!("Received Ctrl-C, shutting down gracefully...");
+            *shutdown.lock() = true;
+        }
+    });
+    
+    let shutdown_check = state.shutdown_signal.clone();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            // Wait for shutdown signal
+            while !*shutdown_check.lock() {
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
+            tracing::info!("Shutting down server...");
+        })
+        .await
+        .unwrap();
+    
+    tracing::info!("Server shutdown complete");
 }
 
 async fn ws_handler(
