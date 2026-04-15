@@ -278,20 +278,20 @@
 
 ## PHASE 4: TESTING & DEPLOYMENT (Week 4+) ✅
 
-### Sprint 4.1: Unit Tests (Days 1-2) ⏳ NOT IMPLEMENTED
+### Sprint 4.1: Unit Tests (Days 1-2) 🔒 PARTIAL
 
-- [ ] **Test indicator calculations**
-  - [ ] `test_rsi_calculation_matches_reference()`
-  - [ ] `test_ema_incremental_equals_full()`
+- [x] **Test indicator calculations**
+  - [x] `test_rsi_calculation_matches_reference()`
+  - [x] `test_ema_incremental_equals_full()`
   - [ ] Test with real data from Binance
 
-- [ ] **Test signal generation**
-  - [ ] `test_crossover_signal_generation()`
-  - [ ] `test_rsi_extreme_signal()`
+- [x] **Test signal generation**
+  - [x] `test_crossover_signal_generation()`
+  - [x] `test_rsi_extreme_signal()`
 
-- [ ] **Test channel operations**
-  - [ ] `test_mpsc_client_channel_bounded()`
-  - [ ] `test_slow_client_doesnt_block_others()`
+- [x] **Test channel operations**
+  - [x] `test_mpsc_client_channel_bounded()`
+  - [x] `test_slow_client_doesnt_block_others()`
 
 **Coverage Target**: 70% of utils/services
 
@@ -411,7 +411,7 @@
 | Phase 1 | ✅ COMPLETE | 95% |
 | Phase 2 | ✅ COMPLETE | 90% |
 | Phase 3 | 🔒 PENDING | 20% |
-| Phase 4 | ✅ PENDING | 15% |
+| Phase 4 | 🔒 IN PROGRESS | 40% |
 
 ---
 
