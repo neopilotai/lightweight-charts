@@ -1,0 +1,63 @@
+groups:
+  - name: trading_alerts
+    interval: 30s
+    rules:
+      # Binance disconnected
+      - alert: BinanceDisconnected
+        expr: binance_connected == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Binance WebSocket disconnected"
+          description: "Binance connection has been down for 2 minutes"
+
+      # High parse error rate
+      - alert: HighParseErrorRate
+        expr: rate(parse_errors_total[5m]) > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High parse error rate"
+          description: "Parse error rate is > 1/sec"
+
+      # Too many WebSocket connections
+      - alert: TooManyConnections
+        expr: websocket_connections_active > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High connection count"
+          description: "WebSocket connections exceeds 500"
+
+      # High message latency
+      - alert: HighMessageLatency
+        expr: histogram_quantile(0.95, rate(message_processing_latency_ms_bucket[5m])) > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High message latency"
+          description: "Message processing p95 latency > 100ms"
+
+      # Binance reconnect storm
+      - alert: BinanceReconnectStorm
+        expr: rate(binance_reconnects_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Binance reconnect storm"
+          description: "Reconnecting to Binance > 5 times/min" 
+
+      # No candles processed
+      - alert: NoCandlesProcessed
+        expr: rate(candles_processed_total[10m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No candles processed"
+          description: "No new candles in the last 5 minutes"
